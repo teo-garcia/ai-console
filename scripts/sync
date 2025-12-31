@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+verify_after=0
+args=()
+
+for arg in "$@"; do
+  if [[ "$arg" == "--verify" ]]; then
+    verify_after=1
+    continue
+  fi
+  args+=("$arg")
+done
+
+if [[ ${#args[@]} -gt 0 ]]; then
+  "$ROOT/scripts/apply-repos" "${args[@]}"
+else
+  "$ROOT/scripts/apply-repos"
+fi
+
+if [[ $verify_after -eq 1 ]]; then
+  "$ROOT/scripts/verify"
+fi

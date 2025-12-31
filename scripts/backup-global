@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+export ROOT
+stamp="$(date +%Y%m%d-%H%M%S)"
+dest_root="$ROOT/backups/$stamp"
+manifest="$dest_root/manifest.txt"
+
+mkdir -p "$dest_root"
+touch "$manifest"
+
+load_targets() {
+  python3 - <<'PY'
+import json
+import os
+
+root = os.environ["ROOT"]
+with open(os.path.join(root, "config/targets.json"), "r", encoding="utf-8") as f:
+    data = json.load(f)
+
+global_targets = data["global"]
+print(
+    global_targets["codex"]["mcpConfig"],
+    global_targets["codex"]["skillsDir"],
+    global_targets["cursor"]["mcpConfig"],
+    global_targets["claude"]["skillsDir"],
+    global_targets["gemini"]["mcpConfig"],
+    sep="\t",
+)
+PY
+}
+
+expand_path() {
+  local path="$1"
+  echo "${path/#\~/$HOME}"
+}
+
+backup_path() {
+  local src="$1"
+  local dest="$2"
+
+  if [[ -e "$src" ]]; then
+    mkdir -p "$(dirname "$dest")"
+    if [[ -d "$src" ]]; then
+      cp -R "$src" "$dest"
+    else
+      cp "$src" "$dest"
+    fi
+    echo "$src -> $dest" >> "$manifest"
+  else
+    echo "missing: $src" >> "$manifest"
+  fi
+}
+
+IFS=$'\t' read -r codex_mcp_config codex_skills_dir cursor_mcp_config claude_skills_dir gemini_mcp_config < <(load_targets)
+
+backup_path "$(expand_path "$codex_mcp_config")" "$dest_root/codex/config.toml"
+backup_path "$(expand_path "$codex_skills_dir")" "$dest_root/codex/skills"
+backup_path "$(expand_path "$cursor_mcp_config")" "$dest_root/cursor/mcp.json"
+backup_path "$(expand_path "$claude_skills_dir")" "$dest_root/claude/commands"
+backup_path "$(expand_path "$gemini_mcp_config")" "$dest_root/gemini/settings.json"
+
+echo "backup complete: $dest_root"

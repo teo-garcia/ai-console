@@ -1,0 +1,114 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+export ROOT
+force=0
+
+if [[ "${1:-}" == "--force" ]]; then
+  force=1
+fi
+
+load_targets() {
+  python3 - <<'PY'
+import json
+import os
+
+root = os.environ["ROOT"]
+with open(os.path.join(root, "config/targets.json"), "r", encoding="utf-8") as f:
+    data = json.load(f)
+
+global_targets = data["global"]
+print(
+    global_targets["codex"]["skillsDir"],
+    global_targets["codex"]["mcpConfig"],
+    global_targets["cursor"]["mcpConfig"],
+    global_targets["claude"]["skillsDir"],
+    global_targets["gemini"]["mcpConfig"],
+    sep="\t",
+)
+PY
+}
+
+expand_path() {
+  local path="$1"
+  echo "${path/#\~/$HOME}"
+}
+
+link() {
+  local src="$1"
+  local dest="$2"
+
+  dest="$(expand_path "$dest")"
+
+  if [[ ! -e "$src" ]]; then
+    echo "skip: missing source $src"
+    return
+  fi
+
+  mkdir -p "$(dirname "$dest")"
+
+  if [[ -e "$dest" && ! -L "$dest" && $force -eq 0 ]]; then
+    echo "skip: $dest exists and is not a symlink (use --force to replace)"
+    return
+  fi
+
+  ln -sfn "$src" "$dest"
+  echo "linked: $dest -> $src"
+}
+
+merge_codex_mcp() {
+  local src="$ROOT/mcp/codex.config.toml"
+  local dest
+  dest="$(expand_path "$1")"
+
+  if [[ ! -f "$src" ]]; then
+    echo "skip: missing source $src"
+    return
+  fi
+
+  mkdir -p "$(dirname "$dest")"
+
+  if [[ ! -f "$dest" ]]; then
+    cp "$src" "$dest"
+    echo "written: $dest"
+    return
+  fi
+
+  local tmp
+  tmp="$(mktemp)"
+
+  awk '
+    BEGIN { inside = 0 }
+    /^\[mcp_servers\./ { inside = 1; next }
+    /^\[/ {
+      if (inside == 1 && $0 !~ /^\[mcp_servers\./) {
+        inside = 0
+      }
+    }
+    { if (inside == 0) print }
+  ' "$dest" > "$tmp"
+
+  printf "\n" >> "$tmp"
+  cat "$src" >> "$tmp"
+
+  cp "$dest" "$dest.bak"
+  mv "$tmp" "$dest"
+  echo "updated: $dest"
+  echo "backup: $dest.bak"
+}
+
+IFS=$'\t' read -r codex_skills_dir codex_mcp_config cursor_mcp_config claude_skills_dir gemini_mcp_config < <(load_targets)
+
+for skill_dir in "$ROOT/skills/codex"/*/; do
+  if [[ -d "$skill_dir" ]]; then
+    skill_name="$(basename "$skill_dir")"
+    link "$skill_dir" "$codex_skills_dir/$skill_name"
+  fi
+done
+
+merge_codex_mcp "$codex_mcp_config"
+
+link "$ROOT/mcp/cursor.mcp.json" "$cursor_mcp_config"
+link "$ROOT/skills/claude" "$claude_skills_dir"
+link "$ROOT/mcp/gemini.settings.json" "$gemini_mcp_config"

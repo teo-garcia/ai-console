@@ -1,0 +1,111 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+export ROOT
+REGISTRY="$ROOT/registry/repos.json"
+force=0
+
+if [[ "${1:-}" == "--force" ]]; then
+  force=1
+fi
+
+if [[ ! -f "$REGISTRY" ]]; then
+  echo "missing registry: $REGISTRY"
+  exit 1
+fi
+
+load_targets() {
+  python3 - <<'PY'
+import json
+import os
+
+root = os.environ["ROOT"]
+with open(os.path.join(root, "config/targets.json"), "r", encoding="utf-8") as f:
+    data = json.load(f)
+
+repo_targets = data["repo"]
+print(
+    repo_targets["codex"]["rules"],
+    repo_targets["cursor"]["rules"],
+    repo_targets["claude"]["rules"],
+    repo_targets["claude"]["mcpConfig"],
+    repo_targets["gemini"]["rules"],
+    repo_targets["gemini"]["mcpConfig"],
+    sep="\t",
+)
+PY
+}
+
+link() {
+  local src="$1"
+  local dest="$2"
+
+  if [[ ! -e "$src" ]]; then
+    echo "skip: missing source $src"
+    return
+  fi
+
+  mkdir -p "$(dirname "$dest")"
+
+  if [[ -e "$dest" && ! -L "$dest" && $force -eq 0 ]]; then
+    echo "skip: $dest exists and is not a symlink (use --force to replace)"
+    return
+  fi
+
+  ln -sfn "$src" "$dest"
+  echo "linked: $dest -> $src"
+}
+
+IFS=$'\t' read -r codex_rules cursor_rules claude_rules claude_mcp_config gemini_rules gemini_mcp_config < <(load_targets)
+
+repo_count=0
+
+while IFS=$'\t' read -r repo ruleset claude_mcp gemini_mcp; do
+  repo_count=$((repo_count + 1))
+
+  if [[ ! -d "$repo" ]]; then
+    echo "skip: repo not found $repo"
+    continue
+  fi
+
+  link "$ROOT/rulesets/$ruleset/codex/AGENTS.md" "$repo/$codex_rules"
+  link "$ROOT/rulesets/$ruleset/cursor/rules" "$repo/$cursor_rules"
+  link "$ROOT/rulesets/$ruleset/claude/rules" "$repo/$claude_rules"
+  link "$ROOT/rulesets/$ruleset/gemini/GEMINI.md" "$repo/$gemini_rules"
+
+  if [[ "$claude_mcp" == "true" ]]; then
+    link "$ROOT/mcp/claude.mcp.json" "$repo/$claude_mcp_config"
+  fi
+
+  if [[ "$gemini_mcp" == "true" ]]; then
+    link "$ROOT/mcp/gemini.settings.json" "$repo/$gemini_mcp_config"
+  fi
+
+done < <(AI_CONSOLE_REGISTRY="$REGISTRY" python3 - <<'PY'
+import json
+import os
+
+registry_path = os.environ["AI_CONSOLE_REGISTRY"]
+
+with open(registry_path, "r", encoding="utf-8") as f:
+    data = json.load(f)
+
+defaults = data.get("defaults", {})
+default_ruleset = defaults.get("ruleset", "core")
+default_claude_mcp = defaults.get("claudeMcp", False)
+default_gemini_mcp = defaults.get("geminiMcp", False)
+
+for entry in data.get("repos", []):
+    path = entry["path"]
+    ruleset = entry.get("ruleset", default_ruleset)
+    claude_mcp = entry.get("claudeMcp", default_claude_mcp)
+    gemini_mcp = entry.get("geminiMcp", default_gemini_mcp)
+    print(f"{path}\t{ruleset}\t{str(claude_mcp).lower()}\t{str(gemini_mcp).lower()}")
+PY
+)
+
+if [[ $repo_count -eq 0 ]]; then
+  echo "no repos configured in $REGISTRY"
+  exit 0
+fi

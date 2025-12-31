@@ -1,0 +1,33 @@
+{
+  "global": {
+    "codex": {
+      "skillsDir": "~/.codex/skills",
+      "mcpConfig": "~/.codex/config.toml"
+    },
+    "cursor": {
+      "mcpConfig": "~/.cursor/mcp.json"
+    },
+    "claude": {
+      "skillsDir": "~/.claude/commands"
+    },
+    "gemini": {
+      "mcpConfig": "~/.gemini/settings.json"
+    }
+  },
+  "repo": {
+    "codex": {
+      "rules": "AGENTS.md"
+    },
+    "cursor": {
+      "rules": ".cursor/rules"
+    },
+    "claude": {
+      "rules": ".claude/rules",
+      "mcpConfig": ".mcp.json"
+    },
+    "gemini": {
+      "rules": "GEMINI.md",
+      "mcpConfig": ".gemini/settings.json"
+    }
+  }
+}

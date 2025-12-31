@@ -1,0 +1,132 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+failures=0
+warnings=0
+
+ok() {
+  echo "ok: $1"
+}
+
+warn() {
+  warnings=$((warnings + 1))
+  echo "warn: $1"
+}
+
+fail() {
+  failures=$((failures + 1))
+  echo "fail: $1"
+}
+
+check_exists() {
+  local path="$1"
+  if [[ -e "$path" ]]; then
+    ok "exists $path"
+  else
+    fail "missing $path"
+  fi
+}
+
+check_symlink_target() {
+  local path="$1"
+  if [[ -L "$path" ]]; then
+    if [[ -e "$path" ]]; then
+      ok "symlink target resolves $path"
+    else
+      fail "broken symlink $path"
+    fi
+  else
+    warn "not a symlink $path"
+  fi
+}
+
+check_json() {
+  local path="$1"
+  if python3 -m json.tool "$path" >/dev/null 2>&1; then
+    ok "valid json $path"
+  else
+    fail "invalid json $path"
+  fi
+}
+
+check_toml() {
+  local path="$1"
+  if python3 - "$path" >/dev/null 2>&1 <<'PY'
+import pathlib
+import sys
+import tomllib
+
+path = pathlib.Path(sys.argv[1])
+tomllib.loads(path.read_text(encoding="utf-8"))
+PY
+  then
+    ok "valid toml $path"
+  else
+    fail "invalid toml $path"
+  fi
+}
+
+check_placeholder_tokens() {
+  local path="$1"
+  if rg -n --fixed-strings 'your_token' "$path" >/dev/null 2>&1; then
+    warn "placeholder token found in $path"
+  else
+    ok "no your_token placeholder in $path"
+  fi
+
+  if rg -n --fixed-strings 'your_key' "$path" >/dev/null 2>&1; then
+    warn "placeholder key found in $path"
+  else
+    ok "no your_key placeholder in $path"
+  fi
+}
+
+check_machine_path() {
+  local path="$1"
+  if rg -n '/Users/' "$path" >/dev/null 2>&1; then
+    warn "machine specific path found in $path"
+  else
+    ok "no machine specific /Users path in $path"
+  fi
+}
+
+echo "verify: checking ai-console templates"
+
+check_exists "$ROOT/mcp/codex.config.toml"
+check_exists "$ROOT/mcp/claude.mcp.json"
+check_exists "$ROOT/mcp/cursor.mcp.json"
+check_exists "$ROOT/mcp/gemini.settings.json"
+check_exists "$ROOT/config/targets.json"
+check_exists "$ROOT/registry/repos.json"
+check_exists "$ROOT/rulesets/core/codex/AGENTS.md"
+check_exists "$ROOT/rulesets/core/cursor/rules/core.mdc"
+check_exists "$ROOT/rulesets/core/claude/rules/core.md"
+check_exists "$ROOT/rulesets/core/gemini/GEMINI.md"
+
+check_symlink_target "$ROOT/AGENTS.md"
+check_symlink_target "$ROOT/GEMINI.md"
+check_symlink_target "$ROOT/.mcp.json"
+check_symlink_target "$ROOT/.claude/rules"
+check_symlink_target "$ROOT/.cursor/rules"
+check_symlink_target "$ROOT/.gemini/settings.json"
+
+check_json "$ROOT/mcp/claude.mcp.json"
+check_json "$ROOT/mcp/cursor.mcp.json"
+check_json "$ROOT/mcp/gemini.settings.json"
+check_json "$ROOT/config/targets.json"
+check_json "$ROOT/registry/repos.json"
+check_toml "$ROOT/mcp/codex.config.toml"
+
+check_placeholder_tokens "$ROOT/mcp/codex.config.toml"
+check_placeholder_tokens "$ROOT/mcp/claude.mcp.json"
+check_placeholder_tokens "$ROOT/mcp/cursor.mcp.json"
+check_placeholder_tokens "$ROOT/mcp/gemini.settings.json"
+check_machine_path "$ROOT/mcp/codex.config.toml"
+
+echo "verify: complete (failures=$failures warnings=$warnings)"
+
+if [[ $failures -gt 0 ]]; then
+  exit 1
+fi
