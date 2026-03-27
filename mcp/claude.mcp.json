@@ -1,18 +1,26 @@
 {
   "mcpServers": {
     "context7": {
+      "type": "http",
       "url": "https://mcp.context7.com/mcp"
     },
     "chrome-devtools": {
       "command": "npx",
-      "args": ["-y", "chrome-devtools-mcp@latest"],
+      "args": [
+        "-y",
+        "chrome-devtools-mcp@latest"
+      ],
       "env": {
         "CHROME_DEBUG_PORT": "9222"
       }
     },
-    "brave-search": {
+    "filesystem": {
       "command": "npx",
-      "args": ["-y", "@brave/brave-search-mcp-server"]
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "/Users/juan.garcia"
+      ]
     },
     "postgres": {
       "command": "npx",

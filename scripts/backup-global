@@ -21,10 +21,13 @@ with open(os.path.join(root, "config/targets.json"), "r", encoding="utf-8") as f
 
 global_targets = data["global"]
 print(
+    global_targets["codex"]["instructions"],
     global_targets["codex"]["mcpConfig"],
     global_targets["codex"]["skillsDir"],
-    global_targets["cursor"]["mcpConfig"],
+    global_targets["claude"]["instructions"],
+    global_targets["claude"]["mcpConfig"],
     global_targets["claude"]["skillsDir"],
+    global_targets["gemini"]["instructions"],
     global_targets["gemini"]["mcpConfig"],
     sep="\t",
 )
@@ -53,12 +56,15 @@ backup_path() {
   fi
 }
 
-IFS=$'\t' read -r codex_mcp_config codex_skills_dir cursor_mcp_config claude_skills_dir gemini_mcp_config < <(load_targets)
+IFS=$'\t' read -r codex_instructions codex_mcp_config codex_skills_dir claude_instructions claude_mcp_config claude_skills_dir gemini_instructions gemini_mcp_config < <(load_targets)
 
+backup_path "$(expand_path "$codex_instructions")" "$dest_root/codex/AGENTS.md"
 backup_path "$(expand_path "$codex_mcp_config")" "$dest_root/codex/config.toml"
 backup_path "$(expand_path "$codex_skills_dir")" "$dest_root/codex/skills"
-backup_path "$(expand_path "$cursor_mcp_config")" "$dest_root/cursor/mcp.json"
+backup_path "$(expand_path "$claude_instructions")" "$dest_root/claude/CLAUDE.md"
+backup_path "$(expand_path "$claude_mcp_config")" "$dest_root/claude/claude.json"
 backup_path "$(expand_path "$claude_skills_dir")" "$dest_root/claude/commands"
+backup_path "$(expand_path "$gemini_instructions")" "$dest_root/gemini/GEMINI.md"
 backup_path "$(expand_path "$gemini_mcp_config")" "$dest_root/gemini/settings.json"
 
 echo "backup complete: $dest_root"

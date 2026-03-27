@@ -1,16 +1,17 @@
 {
   "global": {
     "codex": {
+      "instructions": "~/.codex/AGENTS.md",
       "skillsDir": "~/.codex/skills",
       "mcpConfig": "~/.codex/config.toml"
     },
-    "cursor": {
-      "mcpConfig": "~/.cursor/mcp.json"
-    },
     "claude": {
-      "skillsDir": "~/.claude/commands"
+      "instructions": "~/.claude/CLAUDE.md",
+      "skillsDir": "~/.claude/commands",
+      "mcpConfig": "~/.claude.json"
     },
     "gemini": {
+      "instructions": "~/.gemini/GEMINI.md",
       "mcpConfig": "~/.gemini/settings.json"
     }
   },
@@ -19,10 +20,11 @@
       "rules": "AGENTS.md"
     },
     "cursor": {
-      "rules": ".cursor/rules"
+      "rules": ".cursor/rules",
+      "mcpConfig": "mcp.json"
     },
     "claude": {
-      "rules": ".claude/rules",
+      "rules": "CLAUDE.md",
       "mcpConfig": ".mcp.json"
     },
     "gemini": {

@@ -1,12 +1,18 @@
 {
   "defaults": {
     "ruleset": "core",
-    "claudeMcp": false,
-    "geminiMcp": false
+    "claudeMcp": true,
+    "geminiMcp": true
   },
   "repos": [
     {
       "path": "/Users/juan.garcia/Desktop/_/dev/projects/ai-console",
+      "ruleset": "core",
+      "claudeMcp": true,
+      "geminiMcp": true
+    },
+    {
+      "path": "/Users/juan.garcia/Desktop/_/dev/sandbox/teo-garcia",
       "ruleset": "core",
       "claudeMcp": true,
       "geminiMcp": true

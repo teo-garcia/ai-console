@@ -28,6 +28,7 @@ repo_targets = data["repo"]
 print(
     repo_targets["codex"]["rules"],
     repo_targets["cursor"]["rules"],
+    repo_targets["cursor"]["mcpConfig"],
     repo_targets["claude"]["rules"],
     repo_targets["claude"]["mcpConfig"],
     repo_targets["gemini"]["rules"],
@@ -57,7 +58,7 @@ link() {
   echo "linked: $dest -> $src"
 }
 
-IFS=$'\t' read -r codex_rules cursor_rules claude_rules claude_mcp_config gemini_rules gemini_mcp_config < <(load_targets)
+IFS=$'\t' read -r codex_rules cursor_rules cursor_mcp_config claude_rules claude_mcp_config gemini_rules gemini_mcp_config < <(load_targets)
 
 repo_count=0
 
@@ -71,7 +72,8 @@ while IFS=$'\t' read -r repo ruleset claude_mcp gemini_mcp; do
 
   link "$ROOT/rulesets/$ruleset/codex/AGENTS.md" "$repo/$codex_rules"
   link "$ROOT/rulesets/$ruleset/cursor/rules" "$repo/$cursor_rules"
-  link "$ROOT/rulesets/$ruleset/claude/rules" "$repo/$claude_rules"
+  link "$ROOT/mcp/cursor.mcp.json" "$repo/$cursor_mcp_config"
+  link "$ROOT/rulesets/$ruleset/claude/CLAUDE.md" "$repo/$claude_rules"
   link "$ROOT/rulesets/$ruleset/gemini/GEMINI.md" "$repo/$gemini_rules"
 
   if [[ "$claude_mcp" == "true" ]]; then

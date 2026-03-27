@@ -3,22 +3,10 @@
 [mcp_servers.context7]
 url = "https://mcp.context7.com/mcp"
 
-[mcp_servers.chrome-devtools]
+[mcp_servers."chrome-devtools"]
 command = "npx"
 args = ["-y", "chrome-devtools-mcp@latest"]
 env = { CHROME_DEBUG_PORT = "9222" }
-
-[mcp_servers.github]
-command = "docker"
-args = [
-  "run",
-  "-i",
-  "--rm",
-  "-e",
-  "GITHUB_PERSONAL_ACCESS_TOKEN",
-  "ghcr.io/github/github-mcp-server",
-]
-env_vars = ["GITHUB_PERSONAL_ACCESS_TOKEN"]
 
 [mcp_servers.postgres]
 command = "npx"
@@ -33,5 +21,5 @@ command = "npx"
 args = [
   "-y",
   "@modelcontextprotocol/server-filesystem",
-  "/Users/juan.garcia/Desktop/_/dev/projects",
+  "/Users/juan.garcia",
 ]

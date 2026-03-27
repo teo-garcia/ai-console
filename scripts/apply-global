@@ -20,10 +20,13 @@ with open(os.path.join(root, "config/targets.json"), "r", encoding="utf-8") as f
 
 global_targets = data["global"]
 print(
+    global_targets["codex"]["instructions"],
     global_targets["codex"]["skillsDir"],
     global_targets["codex"]["mcpConfig"],
-    global_targets["cursor"]["mcpConfig"],
+    global_targets["claude"]["instructions"],
     global_targets["claude"]["skillsDir"],
+    global_targets["claude"]["mcpConfig"],
+    global_targets["gemini"]["instructions"],
     global_targets["gemini"]["mcpConfig"],
     sep="\t",
 )
@@ -98,7 +101,58 @@ merge_codex_mcp() {
   echo "backup: $dest.bak"
 }
 
-IFS=$'\t' read -r codex_skills_dir codex_mcp_config cursor_mcp_config claude_skills_dir gemini_mcp_config < <(load_targets)
+merge_claude_mcp() {
+  local src="$ROOT/mcp/claude.mcp.json"
+  local dest
+  dest="$(expand_path "$1")"
+
+  if [[ ! -f "$src" ]]; then
+    echo "skip: missing source $src"
+    return
+  fi
+
+  mkdir -p "$(dirname "$dest")"
+
+  python3 - "$src" "$dest" <<'PY'
+import json
+import pathlib
+import shutil
+import sys
+
+src_path = pathlib.Path(sys.argv[1])
+dest_path = pathlib.Path(sys.argv[2])
+
+src_data = json.loads(src_path.read_text(encoding="utf-8"))
+src_servers = src_data.get("mcpServers", {})
+
+if dest_path.exists():
+    dest_data = json.loads(dest_path.read_text(encoding="utf-8"))
+    backup_path = pathlib.Path(str(dest_path) + ".bak")
+    shutil.copy2(dest_path, backup_path)
+    action = "updated"
+else:
+    dest_data = {}
+    backup_path = None
+    action = "written"
+
+existing_servers = dest_data.get("mcpServers")
+if not isinstance(existing_servers, dict):
+    existing_servers = {}
+
+existing_servers.update(src_servers)
+dest_data["mcpServers"] = existing_servers
+
+dest_path.write_text(json.dumps(dest_data, indent=2) + "\n", encoding="utf-8")
+
+print(f"{action}: {dest_path}")
+if backup_path is not None:
+    print(f"backup: {backup_path}")
+PY
+}
+
+IFS=$'\t' read -r codex_instructions codex_skills_dir codex_mcp_config claude_instructions claude_skills_dir claude_mcp_config gemini_instructions gemini_mcp_config < <(load_targets)
+
+link "$ROOT/rulesets/core/codex/AGENTS.md" "$codex_instructions"
 
 for skill_dir in "$ROOT/skills/codex"/*/; do
   if [[ -d "$skill_dir" ]]; then
@@ -109,6 +163,8 @@ done
 
 merge_codex_mcp "$codex_mcp_config"
 
-link "$ROOT/mcp/cursor.mcp.json" "$cursor_mcp_config"
+link "$ROOT/rulesets/core/claude/CLAUDE.md" "$claude_instructions"
 link "$ROOT/skills/claude" "$claude_skills_dir"
+merge_claude_mcp "$claude_mcp_config"
+link "$ROOT/rulesets/core/gemini/GEMINI.md" "$gemini_instructions"
 link "$ROOT/mcp/gemini.settings.json" "$gemini_mcp_config"
