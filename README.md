@@ -44,7 +44,7 @@ Central control plane for AI rules, skills, and MCP configs.
 - Codex skills must use `<skill-name>/SKILL.md` structure with YAML frontmatter.
 - Cursor rules must be `.mdc` files with metadata headers.
 - Cursor project MCP is linked at `mcp.json`. This repo no longer treats `~/.cursor/mcp.json` as the source of truth.
-- The shared MCP baseline is `context7`, `chrome-devtools`, `filesystem`, `serena`, and `postgres`. GitHub MCP is excluded because GUI clients on macOS do not reliably inherit `GITHUB_PERSONAL_ACCESS_TOKEN`.
+- The shared MCP baseline is `context7`, `datadog`, `chrome-devtools`, `filesystem`, `serena`, and `postgres`. Datadog MCP uses the US5 endpoint at `https://mcp.us5.datadoghq.com/api/unstable/mcp-server/mcp`; GitHub MCP is excluded because GUI clients on macOS do not reliably inherit `GITHUB_PERSONAL_ACCESS_TOKEN`.
 
 ## What lives here
 

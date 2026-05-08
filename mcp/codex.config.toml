@@ -3,6 +3,9 @@
 [mcp_servers.context7]
 url = "https://mcp.context7.com/mcp"
 
+[mcp_servers.datadog]
+url = "https://mcp.us5.datadoghq.com/api/unstable/mcp-server/mcp"
+
 [mcp_servers."chrome-devtools"]
 command = "npx"
 args = ["-y", "chrome-devtools-mcp@latest"]

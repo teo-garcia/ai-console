@@ -2,6 +2,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DATADOG_MCP_URL="https://mcp.us5.datadoghq.com/api/unstable/mcp-server/mcp"
 
 failures=0
 warnings=0
@@ -119,6 +120,48 @@ check_machine_path() {
   fi
 }
 
+check_datadog_mcp() {
+  local path="$1"
+  if [[ "$path" == *.json ]]; then
+    if python3 - "$path" "$DATADOG_MCP_URL" <<'PY'
+import json
+import pathlib
+import sys
+
+path = pathlib.Path(sys.argv[1])
+expected_url = sys.argv[2]
+
+try:
+    data = json.loads(path.read_text(encoding="utf-8"))
+except Exception:
+    sys.exit(1)
+
+server = data.get("mcpServers", {}).get("datadog", {})
+sys.exit(0 if server.get("url") == expected_url else 1)
+PY
+    then
+      ok "Datadog MCP uses US5 endpoint in $path"
+    else
+      fail "Datadog MCP US5 endpoint missing in $path"
+    fi
+  elif awk -v url="$DATADOG_MCP_URL" '
+    $0 == "[mcp_servers.datadog]" { in_datadog = 1; found = 1; next }
+    /^\[mcp_servers\./ { in_datadog = 0 }
+    in_datadog && $0 == "url = \"" url "\"" { url_found = 1 }
+    END { exit !(found && url_found) }
+  ' "$path"; then
+    ok "Datadog MCP uses US5 endpoint in $path"
+  else
+    fail "Datadog MCP US5 endpoint missing in $path"
+  fi
+
+  if rg -n 'https://(mcp|app|api)\.datadoghq\.com' "$path" >/dev/null 2>&1; then
+    fail "Datadog MCP uses a disallowed Datadog host in $path"
+  else
+    ok "no disallowed Datadog MCP host in $path"
+  fi
+}
+
 echo "verify: checking ai-console templates"
 
 check_exists "$ROOT/mcp/codex.config.toml"
@@ -152,6 +195,10 @@ check_placeholder_tokens "$ROOT/mcp/claude.mcp.json"
 check_placeholder_tokens "$ROOT/mcp/cursor.mcp.json"
 check_placeholder_tokens "$ROOT/mcp/gemini.settings.json"
 check_machine_path "$ROOT/mcp/codex.config.toml"
+check_datadog_mcp "$ROOT/mcp/codex.config.toml"
+check_datadog_mcp "$ROOT/mcp/claude.mcp.json"
+check_datadog_mcp "$ROOT/mcp/cursor.mcp.json"
+check_datadog_mcp "$ROOT/mcp/gemini.settings.json"
 
 echo "verify: complete (failures=$failures warnings=$warnings)"
 

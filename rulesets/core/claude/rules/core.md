@@ -49,7 +49,7 @@
 
 ## Configured MCP Baseline
 
-- In this setup, the shared MCP baseline is `context7`, `chrome-devtools`, `filesystem`, `serena`, and `postgres`.
+- In this setup, the shared MCP baseline is `context7`, `datadog`, `chrome-devtools`, `filesystem`, `serena`, and `postgres`.
 - Treat those servers as available capabilities to consider during task intake, not just abstract configuration.
 - Use `context7` for current library or framework docs and version-sensitive API usage.
 - Use `chrome-devtools` for browser inspection, DOM interaction, screenshots, console, network, and performance traces.

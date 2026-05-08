@@ -4,6 +4,10 @@
       "type": "http",
       "url": "https://mcp.context7.com/mcp"
     },
+    "datadog": {
+      "type": "http",
+      "url": "https://mcp.us5.datadoghq.com/api/unstable/mcp-server/mcp"
+    },
     "chrome-devtools": {
       "command": "npx",
       "args": [
