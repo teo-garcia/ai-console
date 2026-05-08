@@ -39,11 +39,12 @@ Central control plane for AI rules, skills, and MCP configs.
 - `scripts/apply-global` merges Claude Code MCP servers into `~/.claude.json` and preserves the rest of Claude's state file.
 - Claude Code commands are linked to `~/.claude/commands/`.
 - Gemini MCP config is linked to `~/.gemini/settings.json`.
+- Serena is included in the shared MCP baseline via `uvx`. Codex uses Serena with `--context codex`; Claude Code, Cursor, and Gemini use `--context ide-assistant`.
 - `scripts/sync --verify` runs `apply-repos` and then runs `verify`.
 - Codex skills must use `<skill-name>/SKILL.md` structure with YAML frontmatter.
 - Cursor rules must be `.mdc` files with metadata headers.
 - Cursor project MCP is linked at `mcp.json`. This repo no longer treats `~/.cursor/mcp.json` as the source of truth.
-- The shared MCP baseline is intentionally limited to `context7`, `chrome-devtools`, `filesystem`, and `postgres`. GitHub MCP is excluded because GUI clients on macOS do not reliably inherit `GITHUB_PERSONAL_ACCESS_TOKEN`.
+- The shared MCP baseline is `context7`, `chrome-devtools`, `filesystem`, `serena`, and `postgres`. GitHub MCP is excluded because GUI clients on macOS do not reliably inherit `GITHUB_PERSONAL_ACCESS_TOKEN`.
 
 ## What lives here
 

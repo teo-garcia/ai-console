@@ -22,6 +22,17 @@
         "/Users/juan.garcia"
       ]
     },
+    "_serena": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/oraios/serena",
+        "serena",
+        "start-mcp-server",
+        "--context",
+        "ide-assistant"
+      ]
+    },
     "postgres": {
       "command": "npx",
       "args": [
@@ -41,6 +52,21 @@
   "security": {
     "auth": {
       "selectedType": "oauth-personal"
+    }
+  },
+  "ui": {
+    "theme": "Default",
+    "inlineThinkingMode": "full",
+    "hideTips": true,
+    "showMemoryUsage": true,
+    "loadingPhrases": "witty"
+  },
+  "model": {
+    "name": ""
+  },
+  "tools": {
+    "shell": {
+      "showColor": false
     }
   }
 }
