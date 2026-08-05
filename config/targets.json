@@ -5,10 +5,18 @@
       "skillsDir": "~/.codex/skills",
       "mcpConfig": "~/.codex/config.toml"
     },
+    "cursor": {
+      "mcpConfig": "~/.cursor/mcp.json"
+    },
     "claude": {
       "instructions": "~/.claude/CLAUDE.md",
       "skillsDir": "~/.claude/commands",
       "mcpConfig": "~/.claude.json"
+    },
+    "opencode": {
+      "instructions": "~/.config/opencode/AGENTS.md",
+      "skillsDir": "~/.config/opencode/skills",
+      "mcpConfig": "~/.config/opencode/opencode.jsonc"
     },
     "gemini": {
       "instructions": "~/.gemini/GEMINI.md",
@@ -26,6 +34,9 @@
     "claude": {
       "rules": "CLAUDE.md",
       "mcpConfig": ".mcp.json"
+    },
+    "opencode": {
+      "rules": "AGENTS.md"
     },
     "gemini": {
       "rules": "GEMINI.md",

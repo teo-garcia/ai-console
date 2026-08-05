@@ -51,6 +51,63 @@ check_json() {
   fi
 }
 
+check_jsonc() {
+  local path="$1"
+  local status
+  status="$(python3 - "$path" <<'PY'
+import json
+import pathlib
+import sys
+
+path = pathlib.Path(sys.argv[1])
+text = path.read_text(encoding="utf-8")
+
+# Strip C-style comments while respecting strings.
+out = []
+i = 0
+in_string = False
+escape = False
+while i < len(text):
+    c = text[i]
+    c2 = text[i:i+2]
+    if in_string:
+        out.append(c)
+        if escape:
+            escape = False
+        elif c == "\\":
+            escape = True
+        elif c == '"':
+            in_string = False
+        i += 1
+    elif c2 == "//":
+        while i < len(text) and text[i] != "\n":
+            i += 1
+    elif c2 == "/*":
+        i += 2
+        while i < len(text) and text[i-2:i] != "*/":
+            i += 1
+    else:
+        if c == '"':
+            in_string = True
+        out.append(c)
+        i += 1
+
+clean = "".join(out)
+try:
+    json.loads(clean)
+    print("valid")
+except Exception as e:
+    print(f"invalid: {e}")
+PY
+)"
+
+  if [[ "$status" == "valid" ]]; then
+    ok "valid jsonc $path"
+  else
+    fail "invalid jsonc $path ($status)"
+  fi
+}
+
 check_toml() {
   local path="$1"
   local status
@@ -124,12 +181,14 @@ echo "verify: checking ai-console templates"
 check_exists "$ROOT/mcp/codex.config.toml"
 check_exists "$ROOT/mcp/claude.mcp.json"
 check_exists "$ROOT/mcp/cursor.mcp.json"
+check_exists "$ROOT/rulesets/core/opencode/opencode.jsonc"
 check_exists "$ROOT/mcp/gemini.settings.json"
 check_exists "$ROOT/config/targets.json"
 check_exists "$ROOT/registry/repos.json"
 check_exists "$ROOT/rulesets/core/codex/AGENTS.md"
 check_exists "$ROOT/rulesets/core/claude/CLAUDE.md"
 check_exists "$ROOT/rulesets/core/cursor/rules/core.mdc"
+check_exists "$ROOT/rulesets/core/opencode/AGENTS.md"
 check_exists "$ROOT/rulesets/core/gemini/GEMINI.md"
 
 check_symlink_target "$ROOT/AGENTS.md"
@@ -139,19 +198,23 @@ check_symlink_target "$ROOT/mcp.json"
 check_symlink_target "$ROOT/.mcp.json"
 check_symlink_target "$ROOT/.cursor/rules"
 check_symlink_target "$ROOT/.gemini/settings.json"
+check_symlink_target "$HOME/.cursor/mcp.json"
 
 check_json "$ROOT/mcp/claude.mcp.json"
 check_json "$ROOT/mcp/cursor.mcp.json"
 check_json "$ROOT/mcp/gemini.settings.json"
 check_json "$ROOT/config/targets.json"
 check_json "$ROOT/registry/repos.json"
+check_jsonc "$ROOT/rulesets/core/opencode/opencode.jsonc"
 check_toml "$ROOT/mcp/codex.config.toml"
 
 check_placeholder_tokens "$ROOT/mcp/codex.config.toml"
+check_placeholder_tokens "$ROOT/rulesets/core/opencode/opencode.jsonc"
 check_placeholder_tokens "$ROOT/mcp/claude.mcp.json"
 check_placeholder_tokens "$ROOT/mcp/cursor.mcp.json"
 check_placeholder_tokens "$ROOT/mcp/gemini.settings.json"
 check_machine_path "$ROOT/mcp/codex.config.toml"
+check_machine_path "$ROOT/rulesets/core/opencode/opencode.jsonc"
 
 echo "verify: complete (failures=$failures warnings=$warnings)"
 

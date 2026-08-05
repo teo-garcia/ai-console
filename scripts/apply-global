@@ -23,9 +23,13 @@ print(
     global_targets["codex"]["instructions"],
     global_targets["codex"]["skillsDir"],
     global_targets["codex"]["mcpConfig"],
+    global_targets["cursor"]["mcpConfig"],
     global_targets["claude"]["instructions"],
     global_targets["claude"]["skillsDir"],
     global_targets["claude"]["mcpConfig"],
+    global_targets["opencode"]["instructions"],
+    global_targets["opencode"]["skillsDir"],
+    global_targets["opencode"]["mcpConfig"],
     global_targets["gemini"]["instructions"],
     global_targets["gemini"]["mcpConfig"],
     sep="\t",
@@ -150,7 +154,7 @@ if backup_path is not None:
 PY
 }
 
-IFS=$'\t' read -r codex_instructions codex_skills_dir codex_mcp_config claude_instructions claude_skills_dir claude_mcp_config gemini_instructions gemini_mcp_config < <(load_targets)
+IFS=$'\t' read -r codex_instructions codex_skills_dir codex_mcp_config cursor_mcp_config claude_instructions claude_skills_dir claude_mcp_config opencode_instructions opencode_skills_dir opencode_mcp_config gemini_instructions gemini_mcp_config < <(load_targets)
 
 link "$ROOT/rulesets/core/codex/AGENTS.md" "$codex_instructions"
 
@@ -163,8 +167,24 @@ done
 
 merge_codex_mcp "$codex_mcp_config"
 
+link "$ROOT/mcp/cursor.mcp.json" "$cursor_mcp_config"
+
 link "$ROOT/rulesets/core/claude/CLAUDE.md" "$claude_instructions"
 link "$ROOT/skills/claude" "$claude_skills_dir"
 merge_claude_mcp "$claude_mcp_config"
+
+link "$ROOT/rulesets/core/opencode/AGENTS.md" "$opencode_instructions"
+# Also wire the home path this client reads when walking up from cwd.
+link "$ROOT/rulesets/core/opencode/AGENTS.md" "~/AGENTS.md"
+
+for skill_dir in "$ROOT/skills/opencode"/*/; do
+  if [[ -d "$skill_dir" ]]; then
+    skill_name="$(basename "$skill_dir")"
+    link "$skill_dir" "$opencode_skills_dir/$skill_name"
+  fi
+done
+
+link "$ROOT/rulesets/core/opencode/opencode.jsonc" "$opencode_mcp_config"
+
 link "$ROOT/rulesets/core/gemini/GEMINI.md" "$gemini_instructions"
 link "$ROOT/mcp/gemini.settings.json" "$gemini_mcp_config"
