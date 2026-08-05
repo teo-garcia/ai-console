@@ -32,8 +32,6 @@ print(
     repo_targets["claude"]["rules"],
     repo_targets["claude"]["mcpConfig"],
     repo_targets["opencode"]["rules"],
-    repo_targets["gemini"]["rules"],
-    repo_targets["gemini"]["mcpConfig"],
     sep="\t",
 )
 PY
@@ -59,11 +57,11 @@ link() {
   echo "linked: $dest -> $src"
 }
 
-IFS=$'\t' read -r codex_rules cursor_rules cursor_mcp_config claude_rules claude_mcp_config opencode_rules gemini_rules gemini_mcp_config < <(load_targets)
+IFS=$'\t' read -r codex_rules cursor_rules cursor_mcp_config claude_rules claude_mcp_config opencode_rules < <(load_targets)
 
 repo_count=0
 
-while IFS=$'\t' read -r repo ruleset claude_mcp gemini_mcp; do
+while IFS=$'\t' read -r repo ruleset claude_mcp; do
   repo_count=$((repo_count + 1))
 
   if [[ ! -d "$repo" ]]; then
@@ -76,14 +74,9 @@ while IFS=$'\t' read -r repo ruleset claude_mcp gemini_mcp; do
   link "$ROOT/mcp/cursor.mcp.json" "$repo/$cursor_mcp_config"
   link "$ROOT/rulesets/$ruleset/claude/CLAUDE.md" "$repo/$claude_rules"
   link "$ROOT/rulesets/$ruleset/opencode/AGENTS.md" "$repo/$opencode_rules"
-  link "$ROOT/rulesets/$ruleset/gemini/GEMINI.md" "$repo/$gemini_rules"
 
   if [[ "$claude_mcp" == "true" ]]; then
     link "$ROOT/mcp/claude.mcp.json" "$repo/$claude_mcp_config"
-  fi
-
-  if [[ "$gemini_mcp" == "true" ]]; then
-    link "$ROOT/mcp/gemini.settings.json" "$repo/$gemini_mcp_config"
   fi
 
 done < <(AI_CONSOLE_REGISTRY="$REGISTRY" python3 - <<'PY'
@@ -98,14 +91,12 @@ with open(registry_path, "r", encoding="utf-8") as f:
 defaults = data.get("defaults", {})
 default_ruleset = defaults.get("ruleset", "core")
 default_claude_mcp = defaults.get("claudeMcp", False)
-default_gemini_mcp = defaults.get("geminiMcp", False)
 
 for entry in data.get("repos", []):
     path = entry["path"]
     ruleset = entry.get("ruleset", default_ruleset)
     claude_mcp = entry.get("claudeMcp", default_claude_mcp)
-    gemini_mcp = entry.get("geminiMcp", default_gemini_mcp)
-    print(f"{path}\t{ruleset}\t{str(claude_mcp).lower()}\t{str(gemini_mcp).lower()}")
+    print(f"{path}\t{ruleset}\t{str(claude_mcp).lower()}")
 PY
 )
 

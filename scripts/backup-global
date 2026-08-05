@@ -31,8 +31,6 @@ print(
     global_targets["opencode"]["instructions"],
     global_targets["opencode"]["mcpConfig"],
     global_targets["opencode"]["skillsDir"],
-    global_targets["gemini"]["instructions"],
-    global_targets["gemini"]["mcpConfig"],
     sep="\t",
 )
 PY
@@ -60,7 +58,7 @@ backup_path() {
   fi
 }
 
-IFS=$'\t' read -r codex_instructions codex_mcp_config codex_skills_dir cursor_mcp_config claude_instructions claude_mcp_config claude_skills_dir opencode_instructions opencode_mcp_config opencode_skills_dir gemini_instructions gemini_mcp_config < <(load_targets)
+IFS=$'\t' read -r codex_instructions codex_mcp_config codex_skills_dir cursor_mcp_config claude_instructions claude_mcp_config claude_skills_dir opencode_instructions opencode_mcp_config opencode_skills_dir < <(load_targets)
 
 backup_path "$(expand_path "$codex_instructions")" "$dest_root/codex/AGENTS.md"
 backup_path "$(expand_path "$codex_mcp_config")" "$dest_root/codex/config.toml"
@@ -72,7 +70,5 @@ backup_path "$(expand_path "$claude_skills_dir")" "$dest_root/claude/commands"
 backup_path "$(expand_path "$opencode_instructions")" "$dest_root/opencode/AGENTS.md"
 backup_path "$(expand_path "$opencode_mcp_config")" "$dest_root/opencode/opencode.jsonc"
 backup_path "$(expand_path "$opencode_skills_dir")" "$dest_root/opencode/skills"
-backup_path "$(expand_path "$gemini_instructions")" "$dest_root/gemini/GEMINI.md"
-backup_path "$(expand_path "$gemini_mcp_config")" "$dest_root/gemini/settings.json"
 
 echo "backup complete: $dest_root"

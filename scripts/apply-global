@@ -32,9 +32,6 @@ print(
     global_targets["opencode"]["instructions"],
     global_targets["opencode"]["skillsDir"],
     global_targets["opencode"]["mcpConfig"],
-    global_targets["gemini"]["instructions"],
-    global_targets["gemini"]["skillsDir"],
-    global_targets["gemini"]["mcpConfig"],
     sep="\t",
 )
 PY
@@ -192,7 +189,7 @@ if backup_path is not None:
 PY
 }
 
-IFS=$'\t' read -r codex_instructions codex_skills_dir codex_mcp_config cursor_skills_dir cursor_mcp_config claude_instructions claude_commands_dir claude_skills_dir claude_mcp_config opencode_instructions opencode_skills_dir opencode_mcp_config gemini_instructions gemini_skills_dir gemini_mcp_config < <(load_targets)
+IFS=$'\t' read -r codex_instructions codex_skills_dir codex_mcp_config cursor_skills_dir cursor_mcp_config claude_instructions claude_commands_dir claude_skills_dir claude_mcp_config opencode_instructions opencode_skills_dir opencode_mcp_config < <(load_targets)
 
 link "$ROOT/rulesets/core/codex/AGENTS.md" "$codex_instructions"
 
@@ -229,7 +226,3 @@ done
 link_portable_skills "$opencode_skills_dir"
 
 link "$ROOT/rulesets/core/opencode/opencode.jsonc" "$opencode_mcp_config"
-
-link "$ROOT/rulesets/core/gemini/GEMINI.md" "$gemini_instructions"
-link_portable_skills "$gemini_skills_dir"
-link "$ROOT/mcp/gemini.settings.json" "$gemini_mcp_config"

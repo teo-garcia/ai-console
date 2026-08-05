@@ -39,15 +39,13 @@ The configured endpoint targets Datadog US5. Anyone using a different Datadog si
 {
   "defaults": {
     "ruleset": "core",
-    "claudeMcp": true,
-    "geminiMcp": true
+    "claudeMcp": true
   },
   "repos": [
     {
       "path": "/Users/juan.garcia/Desktop/_/dev/projects/templates",
       "ruleset": "core",
-      "claudeMcp": true,
-      "geminiMcp": true
+      "claudeMcp": true
     }
   ]
 }
@@ -56,18 +54,17 @@ The configured endpoint targets Datadog US5. Anyone using a different Datadog si
 ## Notes
 
 - `scripts/apply-global` and `scripts/apply-repos` use symlinks where the destination is meant to be a linked artifact. If a target exists and is not a symlink, they will skip it unless you pass `--force`.
-- `scripts/apply-global` links global instruction files to `~/.codex/AGENTS.md`, `~/.claude/CLAUDE.md`, `~/.config/opencode/AGENTS.md`, and `~/.gemini/GEMINI.md`.
+- `scripts/apply-global` links global instruction files to `~/.codex/AGENTS.md`, `~/.claude/CLAUDE.md`, and `~/.config/opencode/AGENTS.md`.
 - `scripts/apply-global` merges `mcp/codex.config.toml` into `~/.codex/config.toml` and writes a backup at `~/.codex/config.toml.bak`.
 - `scripts/apply-global` links `mcp/cursor.mcp.json` to `~/.cursor/mcp.json`, which is shared by Cursor and Cursor Agent.
 - `scripts/apply-global` links `rulesets/core/opencode/opencode.jsonc` to `~/.config/opencode/opencode.jsonc`.
 - `scripts/apply-global` merges Claude Code MCP servers into `~/.claude.json` and preserves the rest of Claude's state file.
 - Claude Code commands are linked to `~/.claude/commands/` and portable skills to `~/.claude/skills/`.
-- Portable skills are linked to Codex, Cursor, Claude Code, OpenCode, and Gemini from the pinned sources under `vendor/`.
+- Portable skills are linked to Codex, Cursor, Claude Code, and OpenCode from the pinned sources under `vendor/`.
 - Matt Pocock's `grill-me` and `grill-with-docs` are included because the upstream README identifies them as its most popular skills.
 - Superpowers provides the shared `test-driven-development` skill; the duplicate from Addy Osmani's pack is intentionally not linked.
-- `scripts/apply-gstack` uses gstack's native generators for Claude Code, Codex, Cursor, and OpenCode. The pinned gstack version has no Gemini CLI host, so the script reports that limitation instead of installing incompatible generated prompts.
-- Gemini MCP config is linked to `~/.gemini/settings.json`.
-- Serena is pinned to a reviewed upstream revision and runs through `uvx`. Codex uses `--context=codex`, Claude Code uses `--context=claude-code`, and Cursor, OpenCode, and Gemini use `--context=ide`.
+- `scripts/apply-gstack` uses gstack's native generators for Claude Code, Codex, Cursor, and OpenCode.
+- Serena is pinned to a reviewed upstream revision and runs through `uvx`. Codex uses `--context=codex`, Claude Code uses `--context=claude-code`, and Cursor and OpenCode use `--context=ide`.
 - Codebase Memory is pinned to npm package `codebase-memory-mcp@0.9.0`; `npx` downloads its platform binary on first start.
 - `scripts/sync --verify` runs `apply-repos` and then runs `verify`.
 - Codex and OpenCode skills must use `<skill-name>/SKILL.md` structure with YAML frontmatter.
@@ -82,7 +79,6 @@ The configured endpoint targets Datadog US5. Anyone using a different Datadog si
   - `{ruleset}/claude/CLAUDE.md` - Links to repo root as `CLAUDE.md` and to `~/.claude/CLAUDE.md`
   - `{ruleset}/cursor/rules/` - Links to repo `.cursor/rules/` (must be `.mdc` files)
   - `{ruleset}/opencode/AGENTS.md` - Links to repo root as `AGENTS.md` and to `~/.config/opencode/AGENTS.md`
-  - `{ruleset}/gemini/GEMINI.md` - Links to repo root as `GEMINI.md` and to `~/.gemini/GEMINI.md`
 - `skills/`: Global commands/skills for tools.
   - `claude/` - Custom slash commands (links to `~/.claude/commands/`)
   - `codex/` - Custom skills in `<name>/SKILL.md` format (links to `~/.codex/skills/`)
@@ -91,7 +87,6 @@ The configured endpoint targets Datadog US5. Anyone using a different Datadog si
 - `mcp/`: MCP server configurations.
   - `claude.mcp.json` - Claude Code MCP servers, merged into `~/.claude.json` and linked to repo `.mcp.json`
   - `cursor.mcp.json` - Cursor MCP servers, linked to `~/.cursor/mcp.json` and repo `mcp.json`
-  - `gemini.settings.json` - Gemini CLI MCP servers, linked to `~/.gemini/settings.json` and repo `.gemini/settings.json`
   - `codex.config.toml` - Codex MCP servers, merged into `~/.codex/config.toml`
   - `rulesets/core/opencode/opencode.jsonc` - OpenCode config, linked to `~/.config/opencode/opencode.jsonc`
 - `registry/`: Repository registry mapping repos to rulesets.

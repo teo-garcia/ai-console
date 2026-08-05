@@ -53,5 +53,3 @@ for skill_dir in "$cursor_source"/gstack*/; do
   ln -sfn "$skill_dir" "$cursor_dest/$skill_name"
   echo "linked: $cursor_dest/$skill_name -> $skill_dir"
 done
-
-echo "note: gstack does not currently ship a Gemini CLI host; no gstack skills were installed for Gemini"

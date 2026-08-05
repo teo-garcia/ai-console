@@ -10,11 +10,11 @@ Respect Claude-specific constraints and response style. Share only the solution 
 
 ## Given
 
-- The repository is a control plane for AI tool rules, skills, and MCP configuration across four clients (Claude, Cursor, Gemini, Codex).
+- The repository is a control plane for AI tool rules, skills, and MCP configuration across four clients (Claude, Cursor, OpenCode, Codex).
 - Operational logic lives in Bash with embedded Python for JSON and TOML manipulation.
 - Four MCP config files maintain the same server set with minor per-tool variations, all hand-maintained in parallel.
 - Machine-specific absolute paths (`/Users/juan.garcia`, `postgresql://...`) are tracked in version control.
-- Rule content is duplicated verbatim across `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, and `core.mdc`.
+- Rule content is duplicated verbatim across `CLAUDE.md`, `AGENTS.md`, and `core.mdc`.
 - No schema validation, no dry-run, no drift detection, no test suite, no CI.
 
 ## Constraints
@@ -52,7 +52,6 @@ Replace the four hand-maintained MCP config files with a single source definitio
 ```
 mcp/
   canonical.json        # server definitions + per-tool profiles with ${VAR} placeholders
-  gemini.base.json      # non-MCP Gemini settings (theme, retention, auth)
   local.json            # machine-local var bindings; git-ignored
   local.example.json    # template for local.json
 ```
@@ -63,7 +62,7 @@ Profile blocks in `canonical.json` bind profile-specific vars (e.g., `SERENA_CON
 
 ### 3. Eliminate ruleset duplication
 
-`CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, and `core.mdc` are identical content. `core.mdc` adds only a YAML front-matter block.
+`CLAUDE.md`, `AGENTS.md`, and `core.mdc` are identical content. `core.mdc` adds only a YAML front-matter block.
 
 Replace with:
 
@@ -73,7 +72,6 @@ rulesets/core/
   templates/
     claude.tmpl
     codex.tmpl
-    gemini.tmpl
     cursor.tmpl         # adds YAML front-matter wrapper
 ```
 
@@ -151,7 +149,7 @@ Respect Composer 2-specific constraints and response style. Share only the solut
 
 ## Given
 
-- The repository is a control plane for rules, skills, and MCP config across Codex, Claude, Cursor, and Gemini.
+- The repository is a control plane for rules, skills, and MCP config across Codex, Claude, Cursor, and OpenCode.
 - Behavior is split across Bash entry points, duplicated inline Python for JSON load and merge, and awk-based stripping of Codex TOML `[mcp_servers.*]` blocks before append.
 - `config/targets.json` and `registry/repos.json` are validated only lightly (`json.tool` in verify); no schema, no dry-run, no shared library for path expansion or symlink policy.
 - `verify` couples template checks to this repo’s own symlinks under the operator’s home layout, which is awkward for CI and other machines.
@@ -199,7 +197,7 @@ Add CI: lint (`ruff`), `pytest`, and `verify` using the templates-only mode so i
 
 ### 6. Canonical MCP and ruleset generation (later, if duplication hurts)
 
-The Go proposals’ `canonical.json` plus `render` step is compatible with a Python CLI; defer until maintaining four MCP files becomes painful. Same for single `_source.md` to regenerate `CLAUDE.md` / `AGENTS.md` / `GEMINI.md` / `core.mdc`.
+The Go proposals’ `canonical.json` plus `render` step is compatible with a Python CLI; defer until maintaining four MCP files becomes painful. Same for single `_source.md` to regenerate `CLAUDE.md` / `AGENTS.md` / `core.mdc`.
 
 ### 7. Scale and performance only when measured
 
@@ -230,205 +228,3 @@ If you later need a single static binary with zero runtime, port the tested Pyth
 4. Add CI (ruff, pytest, verify templates).
 5. Optionally add canonical MCP render or ruleset generation once duplication cost is clear.
 6. Revisit Go/Rust only if binary distribution becomes a hard requirement.
-
-## Gemini 3 Lite
-
-Respect Gemini 3 Lite-specific constraints and response style. Share only the solution below, aligned with the same structure used across the other LLM variants.
-
-# Project Improvement Solution
-
-## Given
-
-- The repository acts as a control plane for rules, skills, and MCP configuration.
-- Operational behavior is implemented through shell scripts with embedded Python.
-- MCP definitions are duplicated across client-specific files.
-- Machine-specific paths are stored in tracked configuration.
-- The repository is both the source of truth and one of the managed targets.
-- Verification exists, but there is no typed application layer, no real test suite, and no CI workflow.
-
-## Constraints
-
-- The project is an orchestration CLI, not a product application.
-- The main bottlenecks are maintainability, correctness, portability, and operational clarity more than raw CPU usage.
-- The migration path should preserve current behavior while reducing script sprawl and duplication.
-- The target state should favor stronger typing, deterministic generation, and better operator interfaces.
-
-## Solution
-
-### 1. Rebuild the operational layer as a typed CLI
-
-- Replace the shell-plus-inline-Python implementation with a single compiled CLI.
-- Use Go as the primary implementation language.
-- Keep Bash only as temporary compatibility wrappers during migration.
-
-Recommended command surface:
-
-- `ai-console apply global`
-- `ai-console apply repos`
-- `ai-console backup`
-- `ai-console verify`
-- `ai-console plan`
-- `ai-console doctor`
-
-### 2. Introduce one canonical configuration model
-
-- Stop maintaining four parallel MCP definitions by hand.
-- Store one canonical MCP model in a portable declarative format.
-- Generate Codex, Claude, Composer, Cursor, and Gemini client outputs from that model.
-- Split tracked defaults from local machine overrides.
-
-Recommended split:
-
-- Tracked: portable defaults, schemas, templates, rulesets
-- Ignored local overrides: workstation paths, local repo registry entries, local credentials, local database URLs
-
-### 3. Separate source-of-truth from generated artifacts
-
-- Treat this repository only as the controller.
-- Do not rely on this same repo being a managed target for its own generated links.
-- Keep source definitions under stable directories and generate target-facing artifacts explicitly.
-
-Recommended modules:
-
-- `cmd/ai-console/`
-- `internal/config/`
-- `internal/render/`
-- `internal/linker/`
-- `internal/merge/`
-- `internal/verify/`
-- `internal/backup/`
-- `testdata/`
-
-### 4. Make operations deterministic and inspectable
-
-- Add `--dry-run` and `--json` output to every mutating command.
-- Add `plan` to show file mutations before applying them.
-- Add `doctor` to explain drift, broken symlinks, invalid config, and missing dependencies.
-- Use structured error messages and stable exit codes.
-
-### 5. Replace prose-only confidence with executable verification
-
-- Add unit tests for parsing, rendering, and merge logic.
-- Add golden tests for generated client config files.
-- Add temp-directory integration tests for symlink behavior and force semantics.
-- Add CI to run verification and tests on every change.
-
-### 6. Normalize repository layout
-
-Recommended top-level shape:
-
-- `cmd/`
-- `internal/`
-- `config/`
-- `rulesets/`
-- `skills/`
-- `templates/`
-- `testdata/`
-- `scripts/` for thin compatibility wrappers only
-
-## Verification
-
-- Confirm generated outputs are byte-stable for the same input.
-- Confirm local overrides do not leak into tracked defaults.
-- Confirm existing workflows still work through compatibility wrappers until cutover is complete.
-- Confirm the repository can manage external targets without depending on self-referential symlinks.
-
-## Risks / assumptions
-
-- Assumption: Go is acceptable as the primary implementation language.
-- Risk: migrating too much at once will break current operator workflows.
-- Risk: if machine-local values remain mixed with tracked config, portability problems will persist.
-- Risk: adding more clients before canonical generation is in place will increase duplication further.
-
-## Recommended migration order
-
-1. Define canonical schemas and local override strategy.
-2. Implement read-only `plan`, `verify`, and `doctor` in Go.
-3. Implement config generation from one canonical MCP model.
-4. Implement `apply global`, `apply repos`, and `backup`.
-5. Add CI and golden tests.
-6. Remove embedded Python and retire most shell logic.
-
-## Gemini CLI
-
-Respect Gemini CLI-specific constraints and response style. Share only the solution below, aligned with the same structure used across the other LLM variants.
-
-# Project Improvement Solution
-
-## Given
-
-- The project is a configuration management hub for AI development rules and MCP settings across multiple clients (Claude, Cursor, Gemini, Codex).
-- The implementation is a hybrid of Bash orchestration and Python-based JSON/TOML processing via heredocs.
-- Redundancy exists in ruleset files (`AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `core.mdc`) and parallel MCP configuration files.
-- Configuration includes machine-specific absolute paths, causing environment drift and portability issues.
-- The system lacks a formal test suite, schema validation, and automated CI.
-
-## Constraints
-
-- Maintain the current "operator-first" utility nature of the tool; keep it lightweight.
-- Ensure zero downtime for existing developer workflows during the transition.
-- Decouple environment-specific paths from tracked version-controlled configuration.
-- The final tool should be easily distributable and require minimal external dependencies.
-
-## Solution
-
-### 1. Unified CLI Core (Go)
-
-Replace the fragmented `scripts/` directory with a single, statically compiled Go binary (`ai-console`). Go provides a "zero-runtime" distribution model, strong typing for complex config merges, and excellent performance for filesystem-heavy tasks.
-
-Key Command Interface:
-- `ai-console sync [--global|--repos] [--force] [--dry-run]`
-- `ai-console plan`: View pending symlink and merge operations.
-- `ai-console doctor`: Validate environment health (binaries, paths, symlink integrity).
-- `ai-console register`: Interactively add/manage repositories.
-- `ai-console backup`: Snapshot current global and repo configurations.
-
-### 2. Declarative Config & Local Overrides
-
-Implement a strict separation between *what* should be configured and *where* it lives on a specific machine.
-
-- **Tracked (`config/targets.json`):** Logic definitions and relative source paths.
-- **Local (`config/local.yaml`):** Machine-specific path bindings (e.g., `home_dir: /Users/juan.garcia`). This file is git-ignored.
-- **Environment Variables:** Allow `${VAR}` interpolation in all configuration files to handle dynamic paths.
-
-### 3. Canonical Ruleset & MCP Templates
-
-Eliminate verbatim duplication by moving to a "Source + Template" model.
-
-- **Source:** Maintain a single `rulesets/core/source.md`.
-- **Templates:** Use Go's `text/template` or simple wrappers to generate client-specific files (`.md`, `.mdc`) with appropriate headers/front-matter.
-- **MCP Hub:** Define one `mcp/servers.yaml` that generates the final JSON/TOML files for each AI client.
-
-### 4. Deterministic State Management
-
-- **Dry-Run Mode:** Every command must support `--dry-run` to output a diff or list of actions without modifying the disk.
-- **Atomic Operations:** Use temporary files for merges to ensure that a failed write doesn't leave configurations in a corrupted state.
-- **Validation Layer:** Use Pydantic-like validation (via Go structs) to ensure `targets.json` and `repos.json` conform to the expected schema before execution.
-
-### 5. Automated Verification & CI
-
-- **Unit Tests:** Test the path expansion and JSON/TOML merging logic in isolation.
-- **Integration Tests:** Use a temporary directory as a mock `$HOME` to verify the end-to-end `apply` flow.
-- **CI Pipeline:** Run `go fmt`, `go vet`, and `go test` on every PR. Add a "drift check" to ensure generated files match the canonical source.
-
-## Verification
-
-- `ai-console sync --dry-run` accurately predicts all required changes.
-- Machine-specific paths are entirely absent from the `git status` diff of tracked JSON files.
-- `ai-console doctor` correctly identifies missing local path bindings or broken symlinks.
-- Generated `CLAUDE.md` and `AGENTS.md` are identical when rendered from the same source.
-
-## Risks / Assumptions
-
-- **Assumption:** The operator has the Go toolchain available for initial build, or we provide pre-compiled binaries.
-- **Risk:** Transitioning to `local.yaml` requires a one-time migration of existing absolute paths out of `repos.json`.
-- **Risk:** Automated TOML merging for Codex is inherently more complex than JSON; requires robust parser-based manipulation rather than line-based edits.
-
-## Recommended Migration Order
-
-1. **Bootstrap:** Create the Go CLI skeleton and implement `doctor` and `plan` (read-only).
-2. **Path Abstraction:** Introduce `local.yaml` and update the CLI to resolve paths dynamically.
-3. **Template Engine:** Move rulesets to a single source and implement the `render` command.
-4. **Execution Layer:** Implement `apply` with atomic writes and `--force` support.
-5. **Wrapper Cutover:** Replace `scripts/*.sh` with simple `ai-console` calls.
-6. **Cleanup:** Remove duplicated ruleset files and absolute paths from version control.

@@ -19,11 +19,6 @@
       "instructions": "~/.config/opencode/AGENTS.md",
       "skillsDir": "~/.config/opencode/skills",
       "mcpConfig": "~/.config/opencode/opencode.jsonc"
-    },
-    "gemini": {
-      "instructions": "~/.gemini/GEMINI.md",
-      "skillsDir": "~/.gemini/skills",
-      "mcpConfig": "~/.gemini/settings.json"
     }
   },
   "repo": {
@@ -40,10 +35,6 @@
     },
     "opencode": {
       "rules": "AGENTS.md"
-    },
-    "gemini": {
-      "rules": "GEMINI.md",
-      "mcpConfig": ".gemini/settings.json"
     }
   }
 }
