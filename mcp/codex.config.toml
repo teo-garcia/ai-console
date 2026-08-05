@@ -27,13 +27,23 @@ args = [
   "/Users/juan.garcia",
 ]
 
-# [mcp_servers.serena]
-# command = "uvx"
-# args = [
-#   "--from",
-#   "git+https://github.com/oraios/serena",
-#   "serena",
-#   "start-mcp-server",
-#   "--context",
-#   "codex",
-# ]
+[mcp_servers.serena]
+startup_timeout_sec = 30
+command = "/Users/juan.garcia/.local/bin/uvx"
+env = { PATH = "/Users/juan.garcia/.nvm/versions/node/v22.22.2/bin:/Users/juan.garcia/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin" }
+args = [
+  "-p",
+  "3.13",
+  "--from",
+  "git+https://github.com/oraios/serena@95583663272ddf5d6e07ae6b99aeb05da3e59fdf",
+  "serena",
+  "start-mcp-server",
+  "--project-from-cwd",
+  "--context=codex",
+]
+
+[mcp_servers.codebase-memory]
+startup_timeout_sec = 30
+command = "/Users/juan.garcia/.nvm/versions/node/v22.22.2/bin/npx"
+env = { PATH = "/Users/juan.garcia/.nvm/versions/node/v22.22.2/bin:/Users/juan.garcia/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin" }
+args = ["-y", "codebase-memory-mcp@0.9.0"]

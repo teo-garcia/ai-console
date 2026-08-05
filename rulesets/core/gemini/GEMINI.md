@@ -49,12 +49,13 @@
 
 ## Configured MCP Baseline
 
-- In this setup, the shared MCP baseline is `context7`, `datadog`, `chrome-devtools`, `filesystem`, `serena`, and `postgres`.
+- In this setup, the shared MCP baseline is `context7`, `datadog`, `chrome-devtools`, `filesystem`, `serena`, `codebase-memory`, and `postgres`.
 - Treat those servers as available capabilities to consider during task intake, not just abstract configuration.
 - Use `context7` for current library or framework docs and version-sensitive API usage.
 - Use `chrome-devtools` for browser inspection, DOM interaction, screenshots, console, network, and performance traces.
 - Use `filesystem` for direct file and directory inspection or edits when that is the safest available path.
 - Use `serena` for codebase navigation and semantic project assistance when available in the client.
+- Use `codebase-memory` for indexed structural queries, call graphs, and impact analysis when available in the client.
 - Use `postgres` for read-only database inspection and query validation against the configured development database.
 - Prefer the MCP tool surfaced by the current client when it answers the question with less ambiguity than shell exploration alone.
 - If a server is configured but unavailable in the current client session, say so briefly and fall back to other approved tools.

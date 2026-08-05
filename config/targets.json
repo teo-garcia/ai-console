@@ -6,11 +6,13 @@
       "mcpConfig": "~/.codex/config.toml"
     },
     "cursor": {
+      "skillsDir": "~/.cursor/skills",
       "mcpConfig": "~/.cursor/mcp.json"
     },
     "claude": {
       "instructions": "~/.claude/CLAUDE.md",
-      "skillsDir": "~/.claude/commands",
+      "commandsDir": "~/.claude/commands",
+      "skillsDir": "~/.claude/skills",
       "mcpConfig": "~/.claude.json"
     },
     "opencode": {
@@ -20,6 +22,7 @@
     },
     "gemini": {
       "instructions": "~/.gemini/GEMINI.md",
+      "skillsDir": "~/.gemini/skills",
       "mcpConfig": "~/.gemini/settings.json"
     }
   },
