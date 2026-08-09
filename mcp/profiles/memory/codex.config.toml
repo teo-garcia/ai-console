@@ -1,0 +1,6 @@
+## Managed by ai-console: memory MCP profile
+
+[mcp_servers.basic-memory]
+startup_timeout_sec = 30
+command = "uvx"
+args = ["--from", "basic-memory==0.22.1", "basic-memory", "mcp"]

@@ -23,18 +23,20 @@
   },
   "repo": {
     "codex": {
-      "rules": "AGENTS.md"
+      "rules": "AGENTS.md",
+      "mcpConfig": ".codex/config.toml"
     },
     "cursor": {
       "rules": ".cursor/rules",
-      "mcpConfig": "mcp.json"
+      "mcpConfig": ".cursor/mcp.json"
     },
     "claude": {
       "rules": "CLAUDE.md",
       "mcpConfig": ".mcp.json"
     },
     "opencode": {
-      "rules": "AGENTS.md"
+      "rules": "AGENTS.md",
+      "mcpConfig": "opencode.jsonc"
     }
   }
 }

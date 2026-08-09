@@ -80,22 +80,31 @@ link_skill() {
 
 link_portable_skills() {
   local skills_dir="$1"
-  local skill_dir
 
   # Matt Pocock identifies these as the repository's most popular skills.
   link_skill "$ROOT/vendor/mattpocock-skills/skills/productivity/grill-me" "$skills_dir"
   link_skill "$ROOT/vendor/mattpocock-skills/skills/engineering/grill-with-docs" "$skills_dir"
+}
 
-  # Superpowers owns the shared test-driven-development name. Addy's duplicate
-  # is skipped below so applying the configuration never overwrites a skill.
-  for skill_dir in "$ROOT/vendor/superpowers/skills"/*/; do
-    [[ -d "$skill_dir" ]] && link_skill "$skill_dir" "$skills_dir"
-  done
+remove_non_global_skills() {
+  local skills_dir
+  local skill_link
+  local target
 
-  for skill_dir in "$ROOT/vendor/addyosmani-agent-skills/skills"/*/; do
-    [[ -d "$skill_dir" ]] || continue
-    [[ "$(basename "$skill_dir")" == "test-driven-development" ]] && continue
-    link_skill "$skill_dir" "$skills_dir"
+  skills_dir="$(expand_path "$1")"
+  [[ -d "$skills_dir" ]] || return
+
+  for skill_link in "$skills_dir"/*; do
+    [[ -L "$skill_link" ]] || continue
+    target="$(readlink "$skill_link")"
+    case "$target" in
+      "$ROOT"/vendor/vercel-labs-agent-skills/*|\
+      "$ROOT"/vendor/shadcn-ui/*|\
+      "$ROOT"/vendor/shadcn-improve/*)
+        unlink "$skill_link"
+        echo "unlinked: $skill_link"
+        ;;
+    esac
   done
 }
 
@@ -163,6 +172,18 @@ dest_path = pathlib.Path(sys.argv[2])
 
 src_data = json.loads(src_path.read_text(encoding="utf-8"))
 src_servers = src_data.get("mcpServers", {})
+managed_servers = {
+    "context7",
+    "basic-memory",
+    "datadog",
+    "chrome-devtools",
+    "filesystem",
+    "postgres",
+    "postgres-archived",
+    "_serena",
+    "serena",
+    "codebase-memory",
+}
 
 if dest_path.exists():
     dest_data = json.loads(dest_path.read_text(encoding="utf-8"))
@@ -178,6 +199,8 @@ existing_servers = dest_data.get("mcpServers")
 if not isinstance(existing_servers, dict):
     existing_servers = {}
 
+for server_name in managed_servers:
+    existing_servers.pop(server_name, None)
 existing_servers.update(src_servers)
 dest_data["mcpServers"] = existing_servers
 
@@ -200,15 +223,18 @@ for skill_dir in "$ROOT/skills/codex"/*/; do
   fi
 done
 
+remove_non_global_skills "$codex_skills_dir"
 link_portable_skills "$codex_skills_dir"
 
 merge_codex_mcp "$codex_mcp_config"
 
 link "$ROOT/mcp/cursor.mcp.json" "$cursor_mcp_config"
+remove_non_global_skills "$cursor_skills_dir"
 link_portable_skills "$cursor_skills_dir"
 
 link "$ROOT/rulesets/core/claude/CLAUDE.md" "$claude_instructions"
 link "$ROOT/skills/claude" "$claude_commands_dir"
+remove_non_global_skills "$claude_skills_dir"
 link_portable_skills "$claude_skills_dir"
 merge_claude_mcp "$claude_mcp_config"
 
@@ -223,6 +249,6 @@ for skill_dir in "$ROOT/skills/opencode"/*/; do
   fi
 done
 
+remove_non_global_skills "$opencode_skills_dir"
 link_portable_skills "$opencode_skills_dir"
-
 link "$ROOT/rulesets/core/opencode/opencode.jsonc" "$opencode_mcp_config"

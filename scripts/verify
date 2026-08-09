@@ -31,9 +31,14 @@ check_exists() {
 
 check_symlink_target() {
   local path="$1"
+  local expected="${2:-}"
   if [[ -L "$path" ]]; then
     if [[ -e "$path" ]]; then
-      ok "symlink target resolves $path"
+      if [[ -n "$expected" && "$(readlink "$path")" != "$expected" ]]; then
+        fail "unexpected symlink target $path -> $(readlink "$path")"
+      else
+        ok "symlink target resolves $path"
+      fi
     else
       fail "broken symlink $path"
     fi
@@ -176,6 +181,15 @@ check_machine_path() {
   fi
 }
 
+check_lean_baseline() {
+  local path="$1"
+  if rg -n 'basic-memory|datadog|chrome-devtools|filesystem|postgres|serena|codebase-memory' "$path" >/dev/null 2>&1; then
+    fail "non-baseline MCP found in $path"
+  else
+    ok "lean MCP baseline in $path"
+  fi
+}
+
 echo "verify: checking ai-console templates"
 
 check_exists "$ROOT/mcp/codex.config.toml"
@@ -190,16 +204,28 @@ check_exists "$ROOT/rulesets/core/cursor/rules/core.mdc"
 check_exists "$ROOT/rulesets/core/opencode/AGENTS.md"
 check_exists "$ROOT/vendor/mattpocock-skills/skills/productivity/grill-me/SKILL.md"
 check_exists "$ROOT/vendor/mattpocock-skills/skills/engineering/grill-with-docs/SKILL.md"
-check_exists "$ROOT/vendor/addyosmani-agent-skills/skills/using-agent-skills/SKILL.md"
-check_exists "$ROOT/vendor/superpowers/skills/using-superpowers/SKILL.md"
-check_exists "$ROOT/vendor/gstack/setup"
+check_exists "$ROOT/vendor/vercel-labs-agent-skills/skills/react-best-practices/SKILL.md"
+check_exists "$ROOT/vendor/shadcn-ui/skills/shadcn/SKILL.md"
+check_exists "$ROOT/vendor/shadcn-improve/skills/improve/SKILL.md"
+check_exists "$ROOT/scripts/toggle-skill"
 
-check_symlink_target "$ROOT/AGENTS.md"
-check_symlink_target "$ROOT/CLAUDE.md"
-check_symlink_target "$ROOT/mcp.json"
-check_symlink_target "$ROOT/.mcp.json"
-check_symlink_target "$ROOT/.cursor/rules"
-check_symlink_target "$HOME/.cursor/mcp.json"
+for profile in browser codebase memory semantic ops; do
+  check_exists "$ROOT/mcp/profiles/$profile/codex.config.toml"
+  check_exists "$ROOT/mcp/profiles/$profile/claude.mcp.json"
+  check_exists "$ROOT/mcp/profiles/$profile/cursor.mcp.json"
+  check_exists "$ROOT/mcp/profiles/$profile/opencode.jsonc"
+done
+
+check_symlink_target "$ROOT/AGENTS.md" "$ROOT/rulesets/core/codex/AGENTS.md"
+check_symlink_target "$ROOT/CLAUDE.md" "$ROOT/rulesets/core/claude/CLAUDE.md"
+check_symlink_target "$ROOT/.cursor/rules" "$ROOT/rulesets/core/cursor/rules"
+check_symlink_target "$HOME/.cursor/mcp.json" "$ROOT/mcp/cursor.mcp.json"
+check_symlink_target "$HOME/.config/opencode/opencode.jsonc" "$ROOT/rulesets/core/opencode/opencode.jsonc"
+
+for skills_dir in "$HOME/.codex/skills" "$HOME/.cursor/skills" "$HOME/.claude/skills" "$HOME/.config/opencode/skills"; do
+  check_symlink_target "$skills_dir/grill-me" "$ROOT/vendor/mattpocock-skills/skills/productivity/grill-me"
+  check_symlink_target "$skills_dir/grill-with-docs" "$ROOT/vendor/mattpocock-skills/skills/engineering/grill-with-docs"
+done
 
 check_json "$ROOT/mcp/claude.mcp.json"
 check_json "$ROOT/mcp/cursor.mcp.json"
@@ -208,12 +234,23 @@ check_json "$ROOT/registry/repos.json"
 check_jsonc "$ROOT/rulesets/core/opencode/opencode.jsonc"
 check_toml "$ROOT/mcp/codex.config.toml"
 
+for profile in browser codebase memory semantic ops; do
+  check_json "$ROOT/mcp/profiles/$profile/claude.mcp.json"
+  check_json "$ROOT/mcp/profiles/$profile/cursor.mcp.json"
+  check_jsonc "$ROOT/mcp/profiles/$profile/opencode.jsonc"
+  check_toml "$ROOT/mcp/profiles/$profile/codex.config.toml"
+done
+
 check_placeholder_tokens "$ROOT/mcp/codex.config.toml"
 check_placeholder_tokens "$ROOT/rulesets/core/opencode/opencode.jsonc"
 check_placeholder_tokens "$ROOT/mcp/claude.mcp.json"
 check_placeholder_tokens "$ROOT/mcp/cursor.mcp.json"
 check_machine_path "$ROOT/mcp/codex.config.toml"
 check_machine_path "$ROOT/rulesets/core/opencode/opencode.jsonc"
+check_lean_baseline "$ROOT/mcp/codex.config.toml"
+check_lean_baseline "$ROOT/mcp/claude.mcp.json"
+check_lean_baseline "$ROOT/mcp/cursor.mcp.json"
+check_lean_baseline "$ROOT/rulesets/core/opencode/opencode.jsonc"
 
 echo "verify: complete (failures=$failures warnings=$warnings)"
 

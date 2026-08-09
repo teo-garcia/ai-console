@@ -1,0 +1,17 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "codebase-memory": {
+      "type": "local",
+      "command": [
+        "/Users/juan.garcia/.nvm/versions/node/v22.22.2/bin/npx",
+        "-y",
+        "codebase-memory-mcp@0.9.0"
+      ],
+      "env": {
+        "PATH": "/Users/juan.garcia/.nvm/versions/node/v22.22.2/bin:/Users/juan.garcia/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+      },
+      "enabled": true
+    }
+  }
+}

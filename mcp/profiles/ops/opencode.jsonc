@@ -1,0 +1,10 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "datadog": {
+      "type": "remote",
+      "url": "https://mcp.us5.datadoghq.com/api/unstable/mcp-server/mcp",
+      "enabled": true
+    }
+  }
+}

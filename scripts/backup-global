@@ -25,8 +25,10 @@ print(
     global_targets["codex"]["mcpConfig"],
     global_targets["codex"]["skillsDir"],
     global_targets["cursor"]["mcpConfig"],
+    global_targets["cursor"]["skillsDir"],
     global_targets["claude"]["instructions"],
     global_targets["claude"]["mcpConfig"],
+    global_targets["claude"]["commandsDir"],
     global_targets["claude"]["skillsDir"],
     global_targets["opencode"]["instructions"],
     global_targets["opencode"]["mcpConfig"],
@@ -58,15 +60,17 @@ backup_path() {
   fi
 }
 
-IFS=$'\t' read -r codex_instructions codex_mcp_config codex_skills_dir cursor_mcp_config claude_instructions claude_mcp_config claude_skills_dir opencode_instructions opencode_mcp_config opencode_skills_dir < <(load_targets)
+IFS=$'\t' read -r codex_instructions codex_mcp_config codex_skills_dir cursor_mcp_config cursor_skills_dir claude_instructions claude_mcp_config claude_commands_dir claude_skills_dir opencode_instructions opencode_mcp_config opencode_skills_dir < <(load_targets)
 
 backup_path "$(expand_path "$codex_instructions")" "$dest_root/codex/AGENTS.md"
 backup_path "$(expand_path "$codex_mcp_config")" "$dest_root/codex/config.toml"
 backup_path "$(expand_path "$codex_skills_dir")" "$dest_root/codex/skills"
 backup_path "$(expand_path "$cursor_mcp_config")" "$dest_root/cursor/mcp.json"
+backup_path "$(expand_path "$cursor_skills_dir")" "$dest_root/cursor/skills"
 backup_path "$(expand_path "$claude_instructions")" "$dest_root/claude/CLAUDE.md"
 backup_path "$(expand_path "$claude_mcp_config")" "$dest_root/claude/claude.json"
-backup_path "$(expand_path "$claude_skills_dir")" "$dest_root/claude/commands"
+backup_path "$(expand_path "$claude_commands_dir")" "$dest_root/claude/commands"
+backup_path "$(expand_path "$claude_skills_dir")" "$dest_root/claude/skills"
 backup_path "$(expand_path "$opencode_instructions")" "$dest_root/opencode/AGENTS.md"
 backup_path "$(expand_path "$opencode_mcp_config")" "$dest_root/opencode/opencode.jsonc"
 backup_path "$(expand_path "$opencode_skills_dir")" "$dest_root/opencode/skills"

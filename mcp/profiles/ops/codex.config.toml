@@ -1,0 +1,4 @@
+## Managed by ai-console: ops MCP profile
+
+[mcp_servers.datadog]
+url = "https://mcp.us5.datadoghq.com/api/unstable/mcp-server/mcp"

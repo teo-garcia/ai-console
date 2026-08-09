@@ -1,18 +1,18 @@
 {
   "defaults": {
     "ruleset": "core",
-    "claudeMcp": true
+    "mcpProfile": "lean"
   },
   "repos": [
     {
       "path": "/Users/juan.garcia/Desktop/_/dev/projects/ai-console",
       "ruleset": "core",
-      "claudeMcp": true
+      "mcpProfile": "lean"
     },
     {
       "path": "/Users/juan.garcia/Desktop/_/dev/sandbox/teo-garcia",
       "ruleset": "core",
-      "claudeMcp": true
+      "mcpProfile": "lean"
     }
   ]
 }

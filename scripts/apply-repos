@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 export ROOT
-REGISTRY="$ROOT/registry/repos.json"
+REGISTRY="${AI_CONSOLE_REGISTRY:-$ROOT/registry/repos.json}"
 force=0
 
 if [[ "${1:-}" == "--force" ]]; then
@@ -27,11 +27,13 @@ with open(os.path.join(root, "config/targets.json"), "r", encoding="utf-8") as f
 repo_targets = data["repo"]
 print(
     repo_targets["codex"]["rules"],
+    repo_targets["codex"]["mcpConfig"],
     repo_targets["cursor"]["rules"],
     repo_targets["cursor"]["mcpConfig"],
     repo_targets["claude"]["rules"],
     repo_targets["claude"]["mcpConfig"],
     repo_targets["opencode"]["rules"],
+    repo_targets["opencode"]["mcpConfig"],
     sep="\t",
 )
 PY
@@ -57,11 +59,41 @@ link() {
   echo "linked: $dest -> $src"
 }
 
-IFS=$'\t' read -r codex_rules cursor_rules cursor_mcp_config claude_rules claude_mcp_config opencode_rules < <(load_targets)
+unlink_managed_mcp() {
+  local dest="$1"
+  local target
+
+  if [[ ! -L "$dest" ]]; then
+    return
+  fi
+
+  target="$(readlink "$dest")"
+  case "$target" in
+    "$ROOT"/mcp/*)
+      unlink "$dest"
+      echo "unlinked: $dest"
+      ;;
+  esac
+}
+
+link_mcp_profile() {
+  local profile="$1"
+  local client_file="$2"
+  local dest="$3"
+
+  if [[ "$profile" == "lean" ]]; then
+    unlink_managed_mcp "$dest"
+    return
+  fi
+
+  link "$ROOT/mcp/profiles/$profile/$client_file" "$dest"
+}
+
+IFS=$'\t' read -r codex_rules codex_mcp_config cursor_rules cursor_mcp_config claude_rules claude_mcp_config opencode_rules opencode_mcp_config < <(load_targets)
 
 repo_count=0
 
-while IFS=$'\t' read -r repo ruleset claude_mcp; do
+while IFS=$'\t' read -r repo ruleset mcp_profile; do
   repo_count=$((repo_count + 1))
 
   if [[ ! -d "$repo" ]]; then
@@ -71,13 +103,19 @@ while IFS=$'\t' read -r repo ruleset claude_mcp; do
 
   link "$ROOT/rulesets/$ruleset/codex/AGENTS.md" "$repo/$codex_rules"
   link "$ROOT/rulesets/$ruleset/cursor/rules" "$repo/$cursor_rules"
-  link "$ROOT/mcp/cursor.mcp.json" "$repo/$cursor_mcp_config"
   link "$ROOT/rulesets/$ruleset/claude/CLAUDE.md" "$repo/$claude_rules"
-  link "$ROOT/rulesets/$ruleset/opencode/AGENTS.md" "$repo/$opencode_rules"
-
-  if [[ "$claude_mcp" == "true" ]]; then
-    link "$ROOT/mcp/claude.mcp.json" "$repo/$claude_mcp_config"
+  if [[ "$opencode_rules" == "$codex_rules" ]]; then
+    echo "shared: $repo/$codex_rules is used by Codex and OpenCode"
+  else
+    link "$ROOT/rulesets/$ruleset/opencode/AGENTS.md" "$repo/$opencode_rules"
   fi
+
+  # Remove the legacy Cursor project path managed by older versions.
+  unlink_managed_mcp "$repo/mcp.json"
+  link_mcp_profile "$mcp_profile" "codex.config.toml" "$repo/$codex_mcp_config"
+  link_mcp_profile "$mcp_profile" "cursor.mcp.json" "$repo/$cursor_mcp_config"
+  link_mcp_profile "$mcp_profile" "claude.mcp.json" "$repo/$claude_mcp_config"
+  link_mcp_profile "$mcp_profile" "opencode.jsonc" "$repo/$opencode_mcp_config"
 
 done < <(AI_CONSOLE_REGISTRY="$REGISTRY" python3 - <<'PY'
 import json
@@ -90,13 +128,19 @@ with open(registry_path, "r", encoding="utf-8") as f:
 
 defaults = data.get("defaults", {})
 default_ruleset = defaults.get("ruleset", "core")
-default_claude_mcp = defaults.get("claudeMcp", False)
+default_mcp_profile = defaults.get("mcpProfile", "lean")
+valid_profiles = {"lean", "browser", "codebase", "memory", "semantic", "ops"}
 
 for entry in data.get("repos", []):
     path = entry["path"]
     ruleset = entry.get("ruleset", default_ruleset)
-    claude_mcp = entry.get("claudeMcp", default_claude_mcp)
-    print(f"{path}\t{ruleset}\t{str(claude_mcp).lower()}")
+    mcp_profile = entry.get("mcpProfile", default_mcp_profile)
+    if mcp_profile not in valid_profiles:
+        raise SystemExit(
+            f"invalid mcpProfile {mcp_profile!r} for {path}; "
+            f"expected one of {', '.join(sorted(valid_profiles))}"
+        )
+    print(f"{path}\t{ruleset}\t{mcp_profile}")
 PY
 )
 
