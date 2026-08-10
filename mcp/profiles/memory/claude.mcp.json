@@ -2,7 +2,12 @@
   "mcpServers": {
     "basic-memory": {
       "command": "uvx",
-      "args": ["--from", "basic-memory==0.22.1", "basic-memory", "mcp"]
+      "args": [
+        "--from",
+        "basic-memory==0.22.1",
+        "basic-memory",
+        "mcp"
+      ]
     }
   }
 }

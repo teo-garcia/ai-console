@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      {
+        "command": "$HOME/.ai-console/bin/ai-console-lifecycle brief cursor",
+        "timeout": 3
+      }
+    ],
+    "stop": [
+      {
+        "command": "$HOME/.ai-console/bin/ai-console-lifecycle capture cursor stop",
+        "timeout": 3
+      }
+    ],
+    "sessionEnd": [
+      {
+        "command": "$HOME/.ai-console/bin/ai-console-lifecycle capture cursor session-end",
+        "timeout": 3
+      }
+    ]
+  }
+}

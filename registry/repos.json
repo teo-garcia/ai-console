@@ -5,12 +5,12 @@
   },
   "repos": [
     {
-      "path": "/Users/juan.garcia/Desktop/_/dev/projects/ai-console",
+      "name": "ai-console",
       "ruleset": "core",
       "mcpProfile": "lean"
     },
     {
-      "path": "/Users/juan.garcia/Desktop/_/dev/sandbox/teo-garcia",
+      "name": "teo-garcia",
       "ruleset": "core",
       "mcpProfile": "lean"
     }

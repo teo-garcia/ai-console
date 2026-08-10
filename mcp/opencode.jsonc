@@ -1,7 +1,5 @@
 {
   "$schema": "https://opencode.ai/config.json",
-
-  // Lean MCP baseline shared with Codex, Cursor, and Claude.
   "mcp": {
     "context7": {
       "type": "remote",

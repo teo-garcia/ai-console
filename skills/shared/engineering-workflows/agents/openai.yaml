@@ -1,0 +1,4 @@
+interface:
+  display_name: "Engineering Workflows"
+  short_description: "System playbooks for safe software work"
+  default_prompt: "Apply the relevant engineering workflow to this task."

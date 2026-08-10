@@ -3,9 +3,16 @@
   "mcp": {
     "chrome-devtools": {
       "type": "local",
-      "command": ["npx", "-y", "chrome-devtools-mcp@1.2.0", "--slim"],
+      "command": [
+        "npx",
+        "-y",
+        "chrome-devtools-mcp@1.2.0",
+        "--slim"
+      ],
       "enabled": true,
-      "env": { "CHROME_DEBUG_PORT": "9222" }
+      "env": {
+        "CHROME_DEBUG_PORT": "9222"
+      }
     }
   }
 }

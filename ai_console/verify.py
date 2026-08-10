@@ -1,0 +1,274 @@
+from __future__ import annotations
+
+import json
+import re
+import shutil
+import tomllib
+from dataclasses import asdict, dataclass
+from pathlib import Path
+
+from .config import ConfigError, ROOT, load_json, load_repo_entries
+from .mcp import expected_outputs, render_all
+from .ops import _managed_servers, merge_claude_config, merge_codex_config
+from .rules import render_rules
+
+
+@dataclass(frozen=True)
+class Check:
+    status: str
+    message: str
+
+
+class Verifier:
+    def __init__(self) -> None:
+        self.checks: list[Check] = []
+
+    def ok(self, message: str) -> None:
+        self.checks.append(Check("ok", message))
+
+    def warn(self, message: str) -> None:
+        self.checks.append(Check("warn", message))
+
+    def fail(self, message: str) -> None:
+        self.checks.append(Check("fail", message))
+
+    @property
+    def failures(self) -> int:
+        return sum(check.status == "fail" for check in self.checks)
+
+    @property
+    def warnings(self) -> int:
+        return sum(check.status == "warn" for check in self.checks)
+
+    def payload(self) -> dict[str, object]:
+        return {
+            "failures": self.failures,
+            "warnings": self.warnings,
+            "checks": [asdict(check) for check in self.checks],
+        }
+
+
+def verify_templates(root: Path = ROOT) -> Verifier:
+    result = Verifier()
+    required = [
+        root / "mcp/canonical.json",
+        root / "config/targets.json",
+        root / "registry/repos.json",
+        root / "registry/repos.local.example.json",
+        root / "rulesets/core/codex/AGENTS.md",
+        root / "rulesets/core/claude/CLAUDE.md",
+        root / "rulesets/core/cursor/rules/core.mdc",
+        root / "rulesets/core/opencode/AGENTS.md",
+        root / "scripts/ai-console",
+        root / "scripts/ai-console-lifecycle",
+        root / "hooks/codex/hooks.json",
+        root / "hooks/claude/settings.json",
+        root / "hooks/cursor/hooks.json",
+        root / "hooks/opencode/ai-console-lifecycle.js",
+        root / "config/model-policy.json",
+    ]
+    for path in required:
+        if path.exists():
+            result.ok(f"exists {path.relative_to(root)}")
+        else:
+            result.fail(f"missing {path.relative_to(root)}")
+
+    try:
+        drift = render_all(root, check=True) + render_rules(root, check=True)
+        if drift:
+            for path in drift:
+                result.fail(f"generated drift {path.relative_to(root)}")
+        else:
+            result.ok("generated MCP configs and client rules match canonical sources")
+    except ConfigError as exc:
+        result.fail(str(exc))
+        return result
+
+    for path in expected_outputs(root):
+        try:
+            if path.suffix == ".toml":
+                tomllib.loads(path.read_text(encoding="utf-8"))
+            else:
+                json.loads(path.read_text(encoding="utf-8"))
+            result.ok(f"valid config {path.relative_to(root)}")
+        except (OSError, ValueError, tomllib.TOMLDecodeError) as exc:
+            result.fail(f"invalid config {path.relative_to(root)}: {exc}")
+
+    for path in sorted((root / "hooks").rglob("*.json")):
+        try:
+            json.loads(path.read_text(encoding="utf-8"))
+            result.ok(f"valid hook config {path.relative_to(root)}")
+        except (OSError, ValueError) as exc:
+            result.fail(f"invalid hook config {path.relative_to(root)}: {exc}")
+
+    portability_paths = [
+        root / "mcp",
+        root / "registry/repos.json",
+        root / "config",
+        root / "hooks",
+    ]
+    machine_pattern = re.compile(r"/Users/[^/\s]+|/home/[^/\s]+")
+    for base in portability_paths:
+        files = [base] if base.is_file() else [path for path in base.rglob("*") if path.is_file()]
+        for path in files:
+            if machine_pattern.search(path.read_text(encoding="utf-8")):
+                result.fail(f"machine-specific path in {path.relative_to(root)}")
+    if not any("machine-specific path" in check.message for check in result.checks):
+        result.ok("tracked configuration contains no home-directory bindings")
+    return result
+
+
+def verify_install(root: Path = ROOT, home: Path | None = None) -> Verifier:
+    active_home = home or Path.home()
+    result = Verifier()
+    expected_links = {
+        active_home / ".codex/AGENTS.md": root / "rulesets/core/codex/AGENTS.md",
+        active_home / ".claude/CLAUDE.md": root / "rulesets/core/claude/CLAUDE.md",
+        active_home / ".claude/commands": root / "skills/claude",
+        active_home / ".config/opencode/AGENTS.md": root
+        / "rulesets/core/opencode/AGENTS.md",
+        active_home / "AGENTS.md": root / "rulesets/core/opencode/AGENTS.md",
+        root / "AGENTS.md": root / "rulesets/core/codex/AGENTS.md",
+        root / "CLAUDE.md": root / "rulesets/core/claude/CLAUDE.md",
+        root / ".cursor/rules": root / "rulesets/core/cursor/rules",
+        active_home / ".cursor/mcp.json": root / "mcp/cursor.mcp.json",
+        active_home / ".config/opencode/opencode.jsonc": root / "mcp/opencode.jsonc",
+        active_home / ".ai-console/bin/ai-console-lifecycle": root
+        / "scripts/ai-console-lifecycle",
+        active_home / ".config/opencode/plugins/ai-console-lifecycle.js": root
+        / "hooks/opencode/ai-console-lifecycle.js",
+    }
+    skill_sources = {
+        "engineering-workflows": root / "skills/shared/engineering-workflows",
+        "grill-me": root / "vendor/mattpocock-skills/skills/productivity/grill-me",
+        "grill-with-docs": root
+        / "vendor/mattpocock-skills/skills/engineering/grill-with-docs",
+    }
+    for skills_dir in (
+        active_home / ".codex/skills",
+        active_home / ".cursor/skills",
+        active_home / ".claude/skills",
+        active_home / ".config/opencode/skills",
+    ):
+        for name, source in skill_sources.items():
+            expected_links[skills_dir / name] = source
+    for client, base in (
+        ("codex", active_home / ".codex/agents"),
+        ("cursor", active_home / ".cursor/agents"),
+        ("claude", active_home / ".claude/agents"),
+        ("opencode", active_home / ".config/opencode/agents"),
+    ):
+        for source in sorted((root / "agents" / client).glob("*")):
+            if source.is_file():
+                expected_links[base / source.name] = source
+    for path, expected in expected_links.items():
+        if not path.is_symlink():
+            result.fail(f"not a symlink {path}")
+        elif Path(path.readlink()) != expected:
+            result.fail(f"unexpected symlink {path} -> {path.readlink()}")
+        elif not path.exists():
+            result.fail(f"broken symlink {path}")
+        else:
+            result.ok(f"installed {path}")
+
+    codex_config = active_home / ".codex/config.toml"
+    try:
+        codex_text = codex_config.read_text(encoding="utf-8")
+        tomllib.loads(codex_text)
+        baseline = (root / "mcp/codex.config.toml").read_text(encoding="utf-8")
+        if merge_codex_config(codex_text, _managed_servers(root), baseline) == codex_text:
+            result.ok(f"managed Codex config is current {codex_config}")
+        else:
+            result.fail(f"managed Codex config has drift {codex_config}")
+    except (OSError, ValueError, tomllib.TOMLDecodeError) as exc:
+        result.fail(f"invalid installed Codex config {codex_config}: {exc}")
+
+    claude_config = active_home / ".claude.json"
+    try:
+        claude_data = load_json(claude_config)
+        baseline_data = load_json(root / "mcp/claude.mcp.json")
+        if (
+            merge_claude_config(claude_data, _managed_servers(root), baseline_data)
+            == claude_data
+        ):
+            result.ok(f"managed Claude config is current {claude_config}")
+        else:
+            result.fail(f"managed Claude config has drift {claude_config}")
+    except ConfigError as exc:
+        result.fail(str(exc))
+
+    for hook_path in (
+        active_home / ".codex/hooks.json",
+        active_home / ".cursor/hooks.json",
+        active_home / ".claude/settings.json",
+    ):
+        try:
+            hook_text = hook_path.read_text(encoding="utf-8")
+            json.loads(hook_text)
+            if "ai-console-lifecycle" in hook_text:
+                result.ok(f"managed lifecycle hooks installed {hook_path}")
+            else:
+                result.fail(f"managed lifecycle hooks missing {hook_path}")
+        except (OSError, ValueError) as exc:
+            result.fail(f"invalid installed hook config {hook_path}: {exc}")
+
+    try:
+        repo_entries = load_repo_entries(root)
+    except ConfigError as exc:
+        result.fail(str(exc))
+        return result
+    repo_targets = load_json(root / "config/targets.json")["repo"]
+    for entry in repo_entries:
+        repo = entry.path
+        if not repo.is_dir():
+            result.warn(f"registered repo is unavailable {entry.name} -> {repo}")
+            continue
+        rule_links = {
+            repo / repo_targets["codex"]["rules"]: root
+            / f"rulesets/{entry.ruleset}/codex/AGENTS.md",
+            repo / repo_targets["cursor"]["rules"]: root
+            / f"rulesets/{entry.ruleset}/cursor/rules",
+            repo / repo_targets["claude"]["rules"]: root
+            / f"rulesets/{entry.ruleset}/claude/CLAUDE.md",
+        }
+        for path, expected in rule_links.items():
+            if path.is_symlink() and Path(path.readlink()) == expected and path.exists():
+                result.ok(f"repo rule installed {path}")
+            elif path.exists():
+                result.warn(f"repo rule is user-owned and was preserved {path}")
+            else:
+                result.fail(f"repo rule missing {path}")
+        if entry.mcp_profile != "lean":
+            filenames = {
+                "codex": "codex.config.toml",
+                "cursor": "cursor.mcp.json",
+                "claude": "claude.mcp.json",
+                "opencode": "opencode.jsonc",
+            }
+            for client, filename in filenames.items():
+                destination = repo / repo_targets[client]["mcpConfig"]
+                expected = root / "mcp/profiles" / entry.mcp_profile / filename
+                if destination.is_symlink() and Path(destination.readlink()) == expected:
+                    result.ok(f"repo MCP profile installed {destination}")
+                else:
+                    result.fail(f"repo MCP profile missing or unexpected {destination}")
+    return result
+
+
+def doctor(root: Path = ROOT) -> Verifier:
+    result = verify_templates(root)
+    for command in ("git", "python3", "npx", "uvx"):
+        if shutil.which(command):
+            result.ok(f"command available {command}")
+        else:
+            result.fail(f"missing command {command}")
+    try:
+        entries = load_repo_entries(root)
+        for entry in entries:
+            if entry.path.is_dir():
+                result.ok(f"repo binding {entry.name} -> {entry.path}")
+            else:
+                result.warn(f"repo path missing {entry.name} -> {entry.path}")
+    except ConfigError as exc:
+        result.fail(str(exc))
+    return result

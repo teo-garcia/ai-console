@@ -1,0 +1,41 @@
+{
+  "description": "AI-console startup context and privacy-safe lifecycle capture.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.ai-console/bin/ai-console-lifecycle brief codex",
+            "timeout": 3,
+            "additionalContextLimit": 1200,
+            "statusMessage": "Loading workspace brief"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.ai-console/bin/ai-console-lifecycle capture codex stop",
+            "timeout": 3
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.ai-console/bin/ai-console-lifecycle capture codex session-end",
+            "timeout": 3
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "principles": [
+    "Route by task risk and ambiguity, not by a permanently favored vendor model.",
+    "Keep model IDs local because client catalogs, entitlements, and prices change.",
+    "Use a fixed client and model for both variants in an evaluation.",
+    "Require an explicit spend ceiling before unattended or repeated model runs."
+  ],
+  "routes": {
+    "triage": {
+      "qualityTier": "fast",
+      "reasoning": "low",
+      "budget": "one short pass",
+      "humanCheckpoint": false
+    },
+    "exploration": {
+      "qualityTier": "fast",
+      "reasoning": "medium",
+      "budget": "bounded read-only pass",
+      "humanCheckpoint": false
+    },
+    "implementation": {
+      "qualityTier": "frontier",
+      "reasoning": "medium",
+      "budget": "task-scoped until verified",
+      "humanCheckpoint": false
+    },
+    "review": {
+      "qualityTier": "frontier",
+      "reasoning": "high",
+      "budget": "one evidence-backed review pass",
+      "humanCheckpoint": false
+    },
+    "highRisk": {
+      "qualityTier": "frontier",
+      "reasoning": "highest available",
+      "budget": "explicit before execution",
+      "humanCheckpoint": true
+    },
+    "evaluation": {
+      "qualityTier": "fixed by experiment",
+      "reasoning": "fixed by experiment",
+      "budget": "explicit run count and spend ceiling",
+      "humanCheckpoint": true
+    }
+  },
+  "promptCaching": {
+    "stablePrefix": "Keep canonical rules stable and client-native; inject volatile workspace state through lifecycle adapters.",
+    "dynamicContextLimit": "Keep startup briefs under 25 lines and exclude transcripts.",
+    "measurement": "Compare repeated-run latency and client-reported cache metrics when available."
+  }
+}

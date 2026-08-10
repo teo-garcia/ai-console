@@ -2,6 +2,5 @@
 
 [mcp_servers.codebase-memory]
 startup_timeout_sec = 30
-command = "/Users/juan.garcia/.nvm/versions/node/v22.22.2/bin/npx"
-env = { PATH = "/Users/juan.garcia/.nvm/versions/node/v22.22.2/bin:/Users/juan.garcia/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin" }
+command = "npx"
 args = ["-y", "codebase-memory-mcp@0.9.0"]

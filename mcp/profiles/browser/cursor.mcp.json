@@ -2,7 +2,11 @@
   "mcpServers": {
     "chrome-devtools": {
       "command": "npx",
-      "args": ["-y", "chrome-devtools-mcp@1.2.0", "--slim"],
+      "args": [
+        "-y",
+        "chrome-devtools-mcp@1.2.0",
+        "--slim"
+      ],
       "env": {
         "CHROME_DEBUG_PORT": "9222"
       }

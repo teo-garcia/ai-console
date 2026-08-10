@@ -1,10 +1,7 @@
 {
   "mcpServers": {
     "serena": {
-      "command": "/Users/juan.garcia/.local/bin/uvx",
-      "env": {
-        "PATH": "/Users/juan.garcia/.nvm/versions/node/v22.22.2/bin:/Users/juan.garcia/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
-      },
+      "command": "uvx",
       "args": [
         "-p",
         "3.13",

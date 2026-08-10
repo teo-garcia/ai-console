@@ -1,0 +1,38 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.ai-console/bin/ai-console-lifecycle brief claude",
+            "timeout": 3
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.ai-console/bin/ai-console-lifecycle capture claude stop",
+            "timeout": 3
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.ai-console/bin/ai-console-lifecycle capture claude session-end",
+            "timeout": 3
+          }
+        ]
+      }
+    ]
+  }
+}

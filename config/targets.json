@@ -3,22 +3,30 @@
     "codex": {
       "instructions": "~/.codex/AGENTS.md",
       "skillsDir": "~/.codex/skills",
-      "mcpConfig": "~/.codex/config.toml"
+      "mcpConfig": "~/.codex/config.toml",
+      "hooksConfig": "~/.codex/hooks.json",
+      "agentsDir": "~/.codex/agents"
     },
     "cursor": {
       "skillsDir": "~/.cursor/skills",
-      "mcpConfig": "~/.cursor/mcp.json"
+      "mcpConfig": "~/.cursor/mcp.json",
+      "hooksConfig": "~/.cursor/hooks.json",
+      "agentsDir": "~/.cursor/agents"
     },
     "claude": {
       "instructions": "~/.claude/CLAUDE.md",
       "commandsDir": "~/.claude/commands",
       "skillsDir": "~/.claude/skills",
-      "mcpConfig": "~/.claude.json"
+      "mcpConfig": "~/.claude.json",
+      "settingsConfig": "~/.claude/settings.json",
+      "agentsDir": "~/.claude/agents"
     },
     "opencode": {
       "instructions": "~/.config/opencode/AGENTS.md",
       "skillsDir": "~/.config/opencode/skills",
-      "mcpConfig": "~/.config/opencode/opencode.jsonc"
+      "mcpConfig": "~/.config/opencode/opencode.jsonc",
+      "pluginsDir": "~/.config/opencode/plugins",
+      "agentsDir": "~/.config/opencode/agents"
     }
   },
   "repo": {

@@ -1,0 +1,6 @@
+{
+  "paths": {
+    "ai-console": "/absolute/path/to/ai-console",
+    "teo-garcia": "/absolute/path/to/teo-garcia"
+  }
+}

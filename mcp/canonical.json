@@ -1,0 +1,87 @@
+{
+  "managedServers": [
+    "context7",
+    "basic-memory",
+    "datadog",
+    "chrome-devtools",
+    "filesystem",
+    "postgres",
+    "postgres-archived",
+    "_serena",
+    "serena",
+    "codebase-memory"
+  ],
+  "global": {
+    "servers": ["context7"]
+  },
+  "profiles": {
+    "browser": {
+      "servers": ["chrome-devtools"]
+    },
+    "codebase": {
+      "servers": ["codebase-memory"]
+    },
+    "memory": {
+      "servers": ["basic-memory"]
+    },
+    "ops": {
+      "servers": ["datadog"]
+    },
+    "semantic": {
+      "servers": ["serena"]
+    }
+  },
+  "servers": {
+    "context7": {
+      "transport": "remote",
+      "url": "https://mcp.context7.com/mcp"
+    },
+    "chrome-devtools": {
+      "transport": "local",
+      "command": "npx",
+      "args": ["-y", "chrome-devtools-mcp@1.2.0", "--slim"],
+      "env": {
+        "CHROME_DEBUG_PORT": "9222"
+      }
+    },
+    "codebase-memory": {
+      "transport": "local",
+      "command": "npx",
+      "args": ["-y", "codebase-memory-mcp@0.9.0"],
+      "startupTimeoutSec": 30
+    },
+    "basic-memory": {
+      "transport": "local",
+      "command": "uvx",
+      "args": ["--from", "basic-memory==0.22.1", "basic-memory", "mcp"],
+      "startupTimeoutSec": 30
+    },
+    "datadog": {
+      "transport": "remote",
+      "url": "https://mcp.us5.datadoghq.com/api/unstable/mcp-server/mcp"
+    },
+    "serena": {
+      "transport": "local",
+      "command": "uvx",
+      "args": [
+        "-p",
+        "3.13",
+        "--from",
+        "git+https://github.com/oraios/serena@95583663272ddf5d6e07ae6b99aeb05da3e59fdf",
+        "serena",
+        "start-mcp-server",
+        "--project-from-cwd",
+        "--context=${SERENA_CONTEXT}"
+      ],
+      "startupTimeoutSec": 30,
+      "clientValues": {
+        "SERENA_CONTEXT": {
+          "codex": "codex",
+          "claude": "claude-code",
+          "cursor": "ide",
+          "opencode": "ide"
+        }
+      }
+    }
+  }
+}

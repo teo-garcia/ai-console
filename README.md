@@ -1,33 +1,93 @@
 # ai-console
 
-Central control plane for AI rules, skills, and MCP configs.
+A portable control plane for Codex, Cursor, Claude Code, and OpenCode. It keeps
+the always-on surface small, renders client configs from canonical sources,
+installs native lifecycle and agent layers, and makes ruleset changes testable.
+
+## Design
+
+- One lean universal rules source, rendered into each client’s native format.
+- One global MCP server (Context7) plus one focused project profile at a time.
+- A small general-purpose skill allowlist; deeper playbooks load on demand.
+- Tracked logical configuration separated from ignored machine-local bindings.
+- Dry-run, backup, restore, doctor, deterministic tests, and CI before mutation.
+- Privacy-safe lifecycle notes and human-reviewed learning candidates.
+- Client-native hooks, agents, rules metadata, and plugins where formats differ.
 
 ## Quick start
 
-1. Run `git submodule update --init --recursive` to fetch the pinned skill sources.
-2. Edit rule sets in `rulesets/`.
-3. Register repos in `registry/repos.json`.
-4. Run `scripts/backup-global` to snapshot current global configs.
-5. Run `scripts/apply-global` for global instructions, the general-purpose skill allowlist, and the lean MCP baseline.
-6. Choose an `mcpProfile` for each repository.
-7. Run `scripts/apply-repos` to link repo rules and the selected MCP profile across Codex, Cursor, Claude Code, and OpenCode.
-8. Authenticate OAuth-backed profile servers when needed (see [Datadog authentication](#datadog-authentication)).
-9. Run `scripts/verify` to validate links and config syntax.
+```sh
+git submodule update --init --recursive
+cp registry/repos.local.example.json registry/repos.local.json
+```
 
-## Skill sources policy
+Edit `registry/repos.local.json` with absolute paths for this machine. Keep
+logical repo names, rulesets, and profiles in the tracked `registry/repos.json`.
 
-Only general-purpose reasoning workflows are linked globally:
+Then inspect and apply:
 
-**Global allowlist**:
-- Matt Pocock's `grill-me`
-- Matt Pocock's `grill-with-docs`
+```sh
+scripts/ai-console doctor
+scripts/ai-console plan all
+scripts/backup-global
+scripts/apply-global
+scripts/apply-repos
+scripts/verify
+```
 
-**Vendored, not linked globally**:
+`apply-global` merges managed Codex, Claude, and hook entries while preserving
+unmanaged config. It links artifacts that are fully owned by the console.
+Existing non-symlink rule or agent targets are skipped unless `--force` is
+explicitly supplied. Directories are never force-replaced.
+
+## Operator commands
+
+```text
+scripts/ai-console render [--check]
+scripts/ai-console plan global|repos|all
+scripts/ai-console apply global|repos [--dry-run] [--force]
+scripts/ai-console verify --scope templates|install|all [--json]
+scripts/ai-console doctor [--json]
+scripts/ai-console backup
+scripts/ai-console restore <timestamp> [--force]
+scripts/ai-console route --task <class> --risk low|medium|high
+scripts/ai-console learn record <correction> --target <layer>
+scripts/ai-console learn draft [--minimum 2]
+scripts/ai-console eval run ...
+scripts/ai-console eval ratings-template <run.json>
+scripts/ai-console eval score <run.json> <ratings.json>
+```
+
+Legacy convenience wrappers (`apply-global`, `apply-repos`, `backup-global`,
+`render`, `restore`, `test`, and `verify`) delegate to the same Python core.
+
+## Rules and skills
+
+Edit `rulesets/core/source.md`, then run `scripts/render`. The renderer produces:
+
+- `rulesets/core/codex/AGENTS.md`
+- `rulesets/core/claude/CLAUDE.md`
+- `rulesets/core/cursor/rules/core.mdc`, including required Cursor metadata
+- `rulesets/core/opencode/AGENTS.md`
+
+The core contains only universal trust, scope, safety, evidence, verification,
+and learning policy. Task procedures live in the `engineering-workflows` skill,
+whose router loads only the relevant reference for debugging, changes, reviews,
+migrations, or architecture decisions.
+
+Globally linked general-purpose skills:
+
+- `engineering-workflows`
+- Matt Pocock’s `grill-me`
+- Matt Pocock’s `grill-with-docs`
+
+Vendored but not globally linked:
+
 - `vercel-labs/agent-skills`
 - `shadcn-ui/ui`
 - `shadcn/improve`
 
-Enable `shadcn/improve` across all four clients only while using it:
+Enable `shadcn/improve` only for the task that needs it:
 
 ```sh
 scripts/toggle-skill enable improve
@@ -35,32 +95,28 @@ scripts/toggle-skill status improve
 scripts/toggle-skill disable improve
 ```
 
-**Do not install permanently**:
-- `garrytan/gstack`
-- `obra/superpowers`
+Never install `garrytan/gstack` or `obra/superpowers` permanently. Pull either
+on demand and remove it after the task.
 
-Never add `garrytan/gstack` or `obra/superpowers` back as permanent skill sources. If a task requires one, pull it on demand and remove it afterwards.
+## MCP configuration
 
-## Datadog authentication
+`mcp/canonical.json` is the only hand-edited MCP definition. `scripts/render`
+generates global and profile configs for all four clients. Rendered files use
+portable executable names (`npx`, `uvx`) and contain no home-directory paths.
 
-The `ops` MCP profile installs the shared Datadog endpoint, but OAuth credentials are stored by each client and are not committed to this repository. Authenticate Codex and Cursor Agent separately:
+| Profile | Capability | Intended use |
+| --- | --- | --- |
+| `lean` | Context7 only | Default; current library documentation |
+| `browser` | Chrome DevTools | DOM, console, network, screenshots, performance |
+| `codebase` | Codebase Memory | Indexed structure and impact analysis |
+| `memory` | Basic Memory | Durable cross-client Markdown knowledge |
+| `semantic` | Serena | Symbol-aware navigation and refactoring |
+| `ops` | Datadog | Operational investigation and observability |
 
-```sh
-codex mcp login datadog
-cursor-agent mcp login datadog
-```
+Profiles are deliberately mutually exclusive. Choose the smallest profile that
+adds a distinct capability instead of composing a permanent tool catalog.
 
-Complete each browser flow, restart the clients, and verify the connections:
-
-```sh
-codex mcp get datadog
-cursor-agent mcp list
-cursor-agent mcp list-tools datadog
-```
-
-The configured endpoint targets Datadog US5. Anyone using a different Datadog site must update the endpoint before authenticating.
-
-## Registry format
+Registry example:
 
 ```json
 {
@@ -70,7 +126,7 @@ The configured endpoint targets Datadog US5. Anyone using a different Datadog si
   },
   "repos": [
     {
-      "path": "/Users/juan.garcia/Desktop/_/dev/projects/templates",
+      "name": "my-service",
       "ruleset": "core",
       "mcpProfile": "codebase"
     }
@@ -78,58 +134,145 @@ The configured endpoint targets Datadog US5. Anyone using a different Datadog si
 }
 ```
 
-Available profiles:
+Local binding, stored only in ignored `registry/repos.local.json`:
 
-- `lean`: Context7 only, inherited from the global baseline.
-- `browser`: Chrome DevTools in slim mode.
-- `codebase`: Codebase Memory for structural and impact analysis.
-- `memory`: Basic Memory for durable, cross-client Markdown knowledge.
-- `semantic`: Serena for symbol-aware navigation and refactoring.
-- `ops`: Datadog for observability work.
+```json
+{
+  "paths": {
+    "my-service": "/absolute/path/on/this/machine"
+  }
+}
+```
 
-Profiles are deliberately mutually exclusive. Select the smallest tool surface that fits the repository's current work instead of composing a large permanent catalog.
+The verifier scans canonical, global, and every profile output for machine home
+paths and fails on generated drift.
 
-## Notes
+### Datadog authentication
 
-- `scripts/apply-global` and `scripts/apply-repos` use symlinks where the destination is meant to be a linked artifact. If a target exists and is not a symlink, they will skip it unless you pass `--force`.
-- `scripts/apply-global` links global instruction files to `~/.codex/AGENTS.md`, `~/.claude/CLAUDE.md`, and `~/.config/opencode/AGENTS.md`.
-- `scripts/apply-global` merges `mcp/codex.config.toml` into `~/.codex/config.toml` and writes a backup at `~/.codex/config.toml.bak`.
-- `scripts/apply-global` links `mcp/cursor.mcp.json` to `~/.cursor/mcp.json`, which is shared by Cursor and Cursor Agent.
-- `scripts/apply-global` links `rulesets/core/opencode/opencode.jsonc` to `~/.config/opencode/opencode.jsonc`.
-- `scripts/apply-global` merges Claude Code MCP servers into `~/.claude.json` and preserves the rest of Claude's state file.
-- Claude Code commands are linked to `~/.claude/commands/` and portable skills to `~/.claude/skills/`.
-- The same allowlisted skills are linked to Codex, Cursor, Claude Code, and OpenCode.
-- Matt Pocock's `grill-me` and `grill-with-docs` are included because the upstream README identifies them as its most popular skills.
-- `scripts/apply-global` removes only managed symlinks for non-global Vercel and shadcn skills; it never deletes unmanaged skill directories.
-- `scripts/apply-repos` links repo rules and one project-scoped MCP profile for every client. Codex and OpenCode share the repository-root `AGENTS.md` policy surface.
-- Serena is pinned to a reviewed upstream revision and runs through `uvx`. Codex uses `--context=codex`, Claude Code uses `--context=claude-code`, and Cursor and OpenCode use `--context=ide`.
-- Codebase Memory is pinned to npm package `codebase-memory-mcp@0.9.0`; `npx` downloads its platform binary on first start.
-- Basic Memory is pinned to `0.22.1` and remains project-selected rather than global; all clients use the same local knowledge store configured by Basic Memory.
-- Chrome DevTools MCP is pinned to `1.2.0` and uses its slim tool surface.
-- `scripts/sync --verify` runs `apply-repos` and then runs `verify`.
-- Codex and OpenCode skills must use `<skill-name>/SKILL.md` structure with YAML frontmatter.
-- Cursor rules must be `.mdc` files with metadata headers.
-- Cursor MCP is linked globally at `~/.cursor/mcp.json`; project profiles use `.cursor/mcp.json`.
-- The shared global MCP baseline is Context7 only. Filesystem and the archived PostgreSQL reference server are intentionally excluded.
-- GitHub MCP remains excluded because the native `git` and `gh` tools cover the common workflow with a smaller tool surface.
+The `ops` profile targets Datadog US5. OAuth credentials remain client-local and
+are never committed:
 
-## What lives here
+```sh
+codex mcp login datadog
+cursor-agent mcp login datadog
+```
 
-- `rulesets/`: Rules grouped by set name for each tool.
-  - `{ruleset}/codex/AGENTS.md` - Links to repo root as `AGENTS.md` and to `~/.codex/AGENTS.md`
-  - `{ruleset}/claude/CLAUDE.md` - Links to repo root as `CLAUDE.md` and to `~/.claude/CLAUDE.md`
-  - `{ruleset}/cursor/rules/` - Links to repo `.cursor/rules/` (must be `.mdc` files)
-  - `{ruleset}/opencode/AGENTS.md` - Links to repo root as `AGENTS.md` and to `~/.config/opencode/AGENTS.md`
-- `skills/`: Global commands/skills for tools.
-  - `claude/` - Custom slash commands (links to `~/.claude/commands/`)
-  - `codex/` - Custom skills in `<name>/SKILL.md` format (links to `~/.codex/skills/`)
-  - `opencode/` - Custom skills in `<name>/SKILL.md` format (links to `~/.config/opencode/skills/`)
-- `vendor/`: Pinned third-party skill sources; only the global allowlist is linked automatically.
-- `mcp/`: MCP server configurations.
-  - `claude.mcp.json` - Lean Claude Code baseline merged into `~/.claude.json`
-  - `cursor.mcp.json` - Lean Cursor baseline linked to `~/.cursor/mcp.json`
-  - `codex.config.toml` - Lean Codex baseline merged into `~/.codex/config.toml`
-  - `profiles/` - Project-scoped MCP configurations for all four clients
-  - `rulesets/core/opencode/opencode.jsonc` - Lean OpenCode baseline linked to `~/.config/opencode/opencode.jsonc`
-- `registry/`: Repository registry mapping repos to rulesets.
-- `scripts/`: Symlink management utilities.
+Change the endpoint in `mcp/canonical.json` before rendering if a different
+Datadog site is required.
+
+## Lifecycle and learning
+
+`apply-global` installs a small launcher at
+`~/.ai-console/bin/ai-console-lifecycle` and merges native adapters:
+
+- Codex: `~/.codex/hooks.json`
+- Claude Code: `~/.claude/settings.json`
+- Cursor: `~/.cursor/hooks.json`
+- OpenCode: `~/.config/opencode/plugins/ai-console-lifecycle.js`
+
+Startup context is capped at 25 lines and contains only repository facts:
+branch, dirty-file summary, recent commits, and the previous captured lifecycle
+event. Hook failures are advisory and fail open.
+
+Session captures live under `~/.ai-console/sessions/` with mode `0600`. They do
+not copy prompts, transcripts, tool output, or full assistant messages. A Stop
+hook extracts only a line explicitly formatted as:
+
+```text
+AI-CONSOLE-CORRECTION: stable correction to review
+```
+
+Corrections can also be recorded manually. `learn draft` groups exact normalized
+repeats and writes a review checklist under `~/.ai-console/drafts/`; it never
+edits rules, skills, hooks, tests, or MCP configuration and never commits.
+
+## Evaluations
+
+`evals/cases.json` contains twelve client-neutral system-behavior cases with
+anchored 1–5 rubrics. The runner supports Codex, Claude, Cursor, and OpenCode,
+uses disposable workspaces, and selects read-only or planning modes without
+bypass or auto-approval flags.
+
+Example A/B plan (no model call):
+
+```sh
+scripts/ai-console eval run --client codex \
+  --variant current=rulesets/core/codex/AGENTS.md \
+  --variant candidate=/path/to/candidate.md \
+  --dry-run
+```
+
+Remove `--dry-run` only after choosing a fixed client/model and spend ceiling.
+Raw runs are ignored under `evals/runs/`. See `evals/README.md` for calibrated
+human scoring.
+
+## Native agents and model policy
+
+The console installs read-only `reviewer` and `planner` agents in each native
+format under `agents/{client}/`. Their models are intentionally inherited from
+the active client so a tracked file cannot become stale or reference an
+unavailable entitlement.
+
+`config/model-policy.json` routes task and risk classes to abstract quality,
+reasoning, budget, and checkpoint requirements. Resolve those tiers to current
+models in the active client. High-risk routes always require a human checkpoint;
+evaluation routes require fixed settings for both variants.
+
+The stable canonical rules prefix plus separately injected volatile brief is
+designed to support client prompt caching. Cache benefit remains a measurement,
+not an assumption; use repeated-run latency or client-reported metrics.
+
+## Backup and restore
+
+`scripts/backup-global` snapshots managed global files, links, skill directories,
+agents, hooks, and OpenCode plugins into ignored `backups/<timestamp>/` with a
+machine-readable manifest.
+
+Restore is preview-only unless forced:
+
+```sh
+scripts/restore <timestamp>
+scripts/restore <timestamp> --force
+```
+
+Restore replaces exactly the paths listed in that snapshot’s manifest. Review
+the preview before applying it.
+
+## Verification and CI
+
+```sh
+scripts/test
+scripts/render --check
+scripts/verify --scope templates
+scripts/verify --scope install
+```
+
+The standard-library test suite covers canonical rendering, portability,
+registry binding, dry-run immutability, merge preservation, all-client profile
+links, lifecycle privacy, learning drafts, native agents, routing, and
+backup/restore round trips. `.github/workflows/verify.yml` runs the same core
+checks on pushes and pull requests.
+
+Codex hook commands require one-time trust after their definition changes; use
+`/hooks` to review them. Relevant native references:
+
+- [Codex hooks](https://learn.chatgpt.com/docs/hooks)
+- [Codex subagents](https://learn.chatgpt.com/docs/agent-configuration/subagents)
+- [Claude Code hooks](https://code.claude.com/docs/en/hooks)
+- [Claude Code subagents](https://code.claude.com/docs/en/sub-agents)
+- [OpenCode plugins](https://opencode.ai/docs/plugins/)
+- [OpenCode agents](https://opencode.ai/docs/agents)
+
+## Repository layout
+
+- `ai_console/`: standard-library operational core
+- `agents/`: native reviewer and planner definitions
+- `config/`: targets and abstract model policy
+- `evals/`: corpus, scoring instructions, ignored run artifacts
+- `hooks/`: native lifecycle adapters
+- `mcp/`: canonical and rendered MCP configuration
+- `registry/`: tracked logical repos and ignored local bindings
+- `rulesets/`: canonical core and rendered client instructions
+- `skills/`: console-owned skills and commands
+- `vendor/`: pinned third-party skill sources
+- `scripts/`: stable operator entry points

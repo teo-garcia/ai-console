@@ -1,2 +1,6 @@
 /backups
 /.serena
+/registry/repos.local.json
+/evals/runs
+__pycache__/
+*.py[cod]
