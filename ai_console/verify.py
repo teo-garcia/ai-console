@@ -22,7 +22,9 @@ from .ops import (
     merge_claude_config,
     merge_claude_settings,
     merge_codex_config,
+    merge_codex_status_line,
     merge_hook_config,
+    merge_nested_config,
 )
 from .rules import render_rules
 
@@ -79,6 +81,9 @@ def verify_templates(root: Path = ROOT) -> Verifier:
         root / "hooks/claude/settings.json",
         root / "hooks/cursor/hooks.json",
         root / "hooks/opencode/ai-console-lifecycle.js",
+        root / "status-lines/codex.json",
+        root / "status-lines/cursor.json",
+        root / "status-lines/claude.sh",
         root / "config/model-policy.json",
         root / "config/capabilities.json",
     ]
@@ -127,6 +132,7 @@ def verify_templates(root: Path = ROOT) -> Verifier:
         root / "registry/repos.json",
         root / "config",
         root / "hooks",
+        root / "status-lines",
     ]
     machine_pattern = re.compile(r"/Users/[^/\s]+|/home/[^/\s]+")
     for base in portability_paths:
@@ -154,6 +160,8 @@ def verify_install(root: Path = ROOT, home: Path | None = None) -> Verifier:
         root / ".cursor/rules": root / "rulesets/core/cursor/rules",
         active_home / ".cursor/mcp.json": root / "mcp/cursor.mcp.json",
         active_home / ".config/opencode/opencode.jsonc": root / "mcp/opencode.jsonc",
+        active_home / ".claude/ai-console-statusline.sh": root
+        / "status-lines/claude.sh",
     }
     skill_sources = {
         "engineering-workflows": root / "skills/shared/engineering-workflows",
@@ -193,11 +201,15 @@ def verify_install(root: Path = ROOT, home: Path | None = None) -> Verifier:
         codex_text = codex_config.read_text(encoding="utf-8")
         tomllib.loads(codex_text)
         baseline = (root / "mcp/codex.config.toml").read_text(encoding="utf-8")
-        if merge_codex_config(codex_text, _managed_servers(root), baseline) == codex_text:
+        merged = merge_codex_config(codex_text, _managed_servers(root), baseline)
+        status_items = load_json(root / "status-lines/codex.json").get("items")
+        if not isinstance(status_items, list):
+            raise ConfigError("Codex status line config requires an items array")
+        if merge_codex_status_line(merged, status_items) == codex_text:
             result.ok(f"managed Codex config is current {codex_config}")
         else:
             result.fail(f"managed Codex config has drift {codex_config}")
-    except (OSError, ValueError, tomllib.TOMLDecodeError) as exc:
+    except (ConfigError, OSError, ValueError, tomllib.TOMLDecodeError) as exc:
         result.fail(f"invalid installed Codex config {codex_config}: {exc}")
 
     claude_config = active_home / ".claude.json"
@@ -211,6 +223,17 @@ def verify_install(root: Path = ROOT, home: Path | None = None) -> Verifier:
             result.ok(f"managed Claude config is current {claude_config}")
         else:
             result.fail(f"managed Claude config has drift {claude_config}")
+    except ConfigError as exc:
+        result.fail(str(exc))
+
+    cursor_config = active_home / ".cursor/cli-config.json"
+    try:
+        cursor_data = load_json(cursor_config)
+        cursor_baseline = load_json(root / "status-lines/cursor.json")
+        if merge_nested_config(cursor_data, cursor_baseline) == cursor_data:
+            result.ok(f"managed Cursor display settings are current {cursor_config}")
+        else:
+            result.fail(f"managed Cursor display settings have drift {cursor_config}")
     except ConfigError as exc:
         result.fail(str(exc))
 

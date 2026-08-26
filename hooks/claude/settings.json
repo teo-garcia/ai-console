@@ -22,6 +22,11 @@
       "Read(~/.aws/**)"
     ]
   },
+  "statusLine": {
+    "type": "command",
+    "command": "~/.claude/ai-console-statusline.sh",
+    "padding": 0
+  },
   "hooks": {
     "SessionStart": [],
     "Stop": [],

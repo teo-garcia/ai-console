@@ -13,6 +13,7 @@ verbosity, native tools, plugins, and ordinary permissions to each client.
 - Tracked logical configuration separated from ignored machine-local bindings.
 - Dry-run, backup, restore, doctor, deterministic tests, and CI before mutation.
 - No ambient lifecycle hook or OpenCode plugin at session startup.
+- Compact, client-native status lines with a shared information hierarchy.
 - Client-native agents and rules metadata where formats differ.
 
 ## Quick start
@@ -188,6 +189,18 @@ Client implementations intentionally differ:
 | Claude Code | Web tools, `--chrome`, `/agents`, `claude plugin`, and classifier-backed `auto` permissions |
 | Cursor Agent | Built-in code/web tools, `cursor-agent plugin`, `--auto-review`, optional sandbox, and explicit `--worktree` |
 | OpenCode | Built-in web/LSP/skills/agents and `opencode plugin <module>`; there is no `/plugin` slash command |
+
+## Status lines
+
+Status lines prioritize the same information in the same order without adding a
+cross-client daemon: model and effort, project and branch, then context. Claude
+also shows its native estimated cost and elapsed session time. Cursor's native
+footer is retained with running time enabled. OpenCode's built-in footer is
+retained because its current TUI schema does not expose status-line composition.
+
+The Claude formatter is event-driven, plain text, and performs only one JSON
+parse and one read-only branch lookup per refresh. It has no polling timer and
+does not write into a repository.
 
 Worktrees and sandboxes are opt-in. The shared rules do not move ordinary work
 out of the active checkout merely to use a subagent or tool.

@@ -124,6 +124,55 @@ def merge_codex_config(existing: str, managed: set[str], baseline: str) -> str:
     return f"{prefix}\n\n{baseline}" if prefix else baseline
 
 
+def merge_codex_status_line(existing: str, items: list[str]) -> str:
+    """Set the managed TUI status line while preserving every other TOML key."""
+    if not items or not all(isinstance(item, str) and item for item in items):
+        raise ConfigError("Codex status line items must be non-empty strings")
+    replacement = f"status_line = {json.dumps(items)}"
+    lines = existing.splitlines()
+    output: list[str] = []
+    section: str | None = None
+    found_tui = False
+    replaced = False
+    header = re.compile(r"^\s*\[([^]]+)]\s*(?:#.*)?$")
+    status_line = re.compile(r"^\s*status_line\s*=")
+    for line in lines:
+        match = header.match(line)
+        if match:
+            if section == "tui" and not replaced:
+                output.append(replacement)
+                replaced = True
+            section = match.group(1).strip()
+            found_tui = found_tui or section == "tui"
+        if section == "tui" and status_line.match(line):
+            if not replaced:
+                output.append(replacement)
+                replaced = True
+            continue
+        output.append(line)
+    if section == "tui" and not replaced:
+        output.append(replacement)
+    elif not found_tui:
+        if output and output[-1] != "":
+            output.append("")
+        output.extend(("[tui]", replacement))
+    return "\n".join(output).rstrip() + "\n"
+
+
+def merge_nested_config(
+    existing: dict[str, Any], baseline: dict[str, Any]
+) -> dict[str, Any]:
+    """Recursively merge a small managed JSON fragment into user settings."""
+    result = dict(existing)
+    for key, value in baseline.items():
+        current = result.get(key)
+        if isinstance(value, dict) and isinstance(current, dict):
+            result[key] = merge_nested_config(current, value)
+        else:
+            result[key] = value
+    return result
+
+
 def merge_claude_config(
     existing: dict[str, Any], managed: set[str], baseline: dict[str, Any]
 ) -> dict[str, Any]:
@@ -209,6 +258,10 @@ def merge_claude_settings(
             )
         permissions[rule_kind] = list(dict.fromkeys([*existing_rules, *managed_rules]))
     result["permissions"] = permissions
+    status_line = baseline.get("statusLine")
+    if not isinstance(status_line, dict):
+        raise ConfigError("Claude settings baseline requires a statusLine object")
+    result["statusLine"] = status_line
     return result
 
 
@@ -319,9 +372,13 @@ def apply_global(
         else ""
     )
     codex_baseline = (root / "mcp/codex.config.toml").read_text(encoding="utf-8")
+    codex_merged = merge_codex_config(codex_existing, managed, codex_baseline)
+    codex_status = load_json(root / "status-lines/codex.json").get("items")
+    if not isinstance(codex_status, list):
+        raise ConfigError("Codex status line config requires an items array")
     runner.write(
         codex_destination,
-        merge_codex_config(codex_existing, managed, codex_baseline),
+        merge_codex_status_line(codex_merged, codex_status),
         backup=True,
     )
 
@@ -337,6 +394,18 @@ def apply_global(
 
     runner.link(root / "mcp/cursor.mcp.json", target("cursor", "mcpConfig"))
     runner.link(root / "mcp/opencode.jsonc", target("opencode", "mcpConfig"))
+    cursor_destination = target("cursor", "cliConfig")
+    cursor_existing = load_json(cursor_destination) if cursor_destination.exists() else {}
+    cursor_baseline = load_json(root / "status-lines/cursor.json")
+    runner.write(
+        cursor_destination,
+        json.dumps(merge_nested_config(cursor_existing, cursor_baseline), indent=2)
+        + "\n",
+        backup=True,
+    )
+    runner.link(
+        root / "status-lines/claude.sh", target("claude", "statusLineScript")
+    )
 
     _unlink_exact_link(
         runner,
@@ -486,12 +555,14 @@ def backup_global(root: Path = ROOT, home: Path | None = None) -> Path:
         "codex/skills": target("codex", "skillsDir"),
         "codex/agents": target("codex", "agentsDir"),
         "cursor/mcp.json": target("cursor", "mcpConfig"),
+        "cursor/cli-config.json": target("cursor", "cliConfig"),
         "cursor/hooks.json": target("cursor", "hooksConfig"),
         "cursor/skills": target("cursor", "skillsDir"),
         "cursor/agents": target("cursor", "agentsDir"),
         "claude/CLAUDE.md": target("claude", "instructions"),
         "claude/claude.json": target("claude", "mcpConfig"),
         "claude/settings.json": target("claude", "settingsConfig"),
+        "claude/ai-console-statusline.sh": target("claude", "statusLineScript"),
         "claude/commands": target("claude", "commandsDir"),
         "claude/skills": target("claude", "skillsDir"),
         "claude/agents": target("claude", "agentsDir"),

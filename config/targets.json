@@ -10,6 +10,7 @@
     "cursor": {
       "skillsDir": "~/.cursor/skills",
       "mcpConfig": "~/.cursor/mcp.json",
+      "cliConfig": "~/.cursor/cli-config.json",
       "hooksConfig": "~/.cursor/hooks.json",
       "agentsDir": "~/.cursor/agents"
     },
@@ -19,6 +20,7 @@
       "skillsDir": "~/.claude/skills",
       "mcpConfig": "~/.claude.json",
       "settingsConfig": "~/.claude/settings.json",
+      "statusLineScript": "~/.claude/ai-console-statusline.sh",
       "agentsDir": "~/.claude/agents"
     },
     "opencode": {

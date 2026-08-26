@@ -15,7 +15,9 @@ from ai_console.ops import (
     merge_claude_config,
     merge_claude_settings,
     merge_codex_config,
+    merge_codex_status_line,
     merge_hook_config,
+    merge_nested_config,
     restore_backup,
 )
 from tests.helpers import PROJECT_ROOT, copy_template_tree, make_registry
@@ -63,6 +65,30 @@ class RunnerTests(unittest.TestCase):
 
 
 class MergeTests(unittest.TestCase):
+    def test_codex_status_line_replaces_only_managed_tui_key(self) -> None:
+        existing = '[tui]\nstatus_line = ["old"]\nsession_picker_view = "comfortable"\n\n[features]\nflag = true\n'
+
+        merged = merge_codex_status_line(
+            existing, ["model-with-reasoning", "git-branch"]
+        )
+
+        self.assertIn(
+            'status_line = ["model-with-reasoning", "git-branch"]', merged
+        )
+        self.assertIn('session_picker_view = "comfortable"', merged)
+        self.assertIn("[features]\nflag = true", merged)
+
+    def test_nested_merge_preserves_unmanaged_cursor_display_settings(self) -> None:
+        existing = {"display": {"mode": "zen"}, "authInfo": {"token": "private"}}
+
+        merged = merge_nested_config(
+            existing, {"display": {"showStatusLineRunningTime": True}}
+        )
+
+        self.assertEqual(merged["display"]["mode"], "zen")
+        self.assertTrue(merged["display"]["showStatusLineRunningTime"])
+        self.assertEqual(merged["authInfo"], {"token": "private"})
+
     def test_codex_merge_replaces_only_managed_server_tables(self) -> None:
         existing = """model = \"custom\"
 
@@ -177,6 +203,7 @@ url = \"stale\"
                 "ask": ["Bash(git push *)"],
                 "deny": ["Read(.env)"],
             },
+            "statusLine": {"type": "command", "command": "statusline.sh"},
             "hooks": {"SessionStart": [], "Stop": [], "SessionEnd": []},
         }
 
@@ -290,6 +317,9 @@ class GlobalApplyTests(unittest.TestCase):
                 json.dumps({"version": 1, "hooks": {"sessionStart": [{"command": "herdr"}]}}),
                 encoding="utf-8",
             )
+            (home / ".cursor/cli-config.json").write_text(
+                json.dumps({"display": {"mode": "zen"}}), encoding="utf-8"
+            )
             (home / ".claude/settings.json").write_text(
                 json.dumps({"theme": "dark"}), encoding="utf-8"
             )
@@ -307,6 +337,9 @@ class GlobalApplyTests(unittest.TestCase):
             codex_config = (home / ".codex/config.toml").read_text(encoding="utf-8")
             codex_hooks = json.loads((home / ".codex/hooks.json").read_text(encoding="utf-8"))
             cursor_hooks = json.loads((home / ".cursor/hooks.json").read_text(encoding="utf-8"))
+            cursor_config = json.loads(
+                (home / ".cursor/cli-config.json").read_text(encoding="utf-8")
+            )
             claude_settings = json.loads(
                 (home / ".claude/settings.json").read_text(encoding="utf-8")
             )
@@ -320,6 +353,13 @@ class GlobalApplyTests(unittest.TestCase):
             )
             self.assertEqual(claude_settings["theme"], "dark")
             self.assertEqual(claude_settings["permissions"]["defaultMode"], "auto")
+            self.assertEqual(
+                claude_settings["statusLine"]["command"],
+                "~/.claude/ai-console-statusline.sh",
+            )
+            self.assertTrue(cursor_config["display"]["showStatusLineRunningTime"])
+            self.assertEqual(cursor_config["display"]["mode"], "zen")
+            self.assertTrue((home / ".claude/ai-console-statusline.sh").is_symlink())
             self.assertIn(
                 "Bash(git push *)", claude_settings["permissions"]["ask"]
             )
