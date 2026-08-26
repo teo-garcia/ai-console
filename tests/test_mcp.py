@@ -7,7 +7,15 @@ import unittest
 from pathlib import Path
 
 from ai_console.config import ConfigError
-from ai_console.mcp import CLIENTS, expected_outputs, render_all, server_for_client
+from ai_console.mcp import (
+    CLIENTS,
+    effective_server_names,
+    expected_outputs,
+    profile_config_path,
+    render_all,
+    render_profile_config,
+    server_for_client,
+)
 from ai_console.rules import expected_rule_outputs, render_rules
 from tests.helpers import copy_template_tree
 
@@ -23,6 +31,14 @@ class McpRenderingTests(unittest.TestCase):
                 tomllib.loads(content)
             else:
                 json.loads(content)
+
+        codex = outputs[Path(__file__).resolve().parent.parent / "mcp/codex.config.toml"]
+        self.assertIn('default_tools_approval_mode = "auto"', codex)
+        browser = outputs[
+            Path(__file__).resolve().parent.parent
+            / "mcp/profiles/browser/codex.config.toml"
+        ]
+        self.assertIn('default_tools_approval_mode = "writes"', browser)
 
     def test_render_check_detects_and_repairs_drift(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -44,6 +60,59 @@ class McpRenderingTests(unittest.TestCase):
 
         with self.assertRaisesRegex(ConfigError, "missing client value"):
             server_for_client(server, "cursor")
+
+    def test_serena_profile_uses_central_cache_without_repo_data(self) -> None:
+        root = Path(__file__).resolve().parent.parent
+        outputs = expected_outputs(root)
+
+        for client, filename in {
+            "codex": "codex.config.toml",
+            "claude": "claude.mcp.json",
+            "cursor": "cursor.mcp.json",
+            "opencode": "opencode.jsonc",
+        }.items():
+            content = outputs[root / "mcp/profiles/semantic" / filename]
+            self.assertIn("SERENA_HOME", content, client)
+            self.assertIn("project_serena_folder_location", content, client)
+            self.assertIn("--enable-web-dashboard false", content, client)
+            self.assertNotIn('$projectDir/.serena', content, client)
+
+    def test_additive_profile_render_unions_servers_without_global_baseline(self) -> None:
+        content = render_profile_config(
+            Path(__file__).resolve().parent.parent,
+            ("browser", "semantic"),
+            "codex",
+        )
+
+        self.assertIn("[mcp_servers.chrome-devtools]", content)
+        self.assertIn("[mcp_servers.serena]", content)
+        self.assertNotIn("[mcp_servers.context7]", content)
+
+    def test_effective_servers_are_lean_and_profile_compatible(self) -> None:
+        root = Path(__file__).resolve().parent.parent
+
+        servers = effective_server_names(root, ("browser", "semantic"))
+
+        self.assertEqual(
+            servers,
+            (
+                "context7",
+                "chrome-devtools",
+                "serena",
+            ),
+        )
+        self.assertEqual(
+            profile_config_path(root, ("browser", "semantic"), "codex"),
+            root / "mcp/composed/browser+semantic/codex.config.toml",
+        )
+
+    def test_global_catalog_contains_only_the_lean_baseline(self) -> None:
+        root = Path(__file__).resolve().parent.parent
+
+        self.assertEqual(
+            effective_server_names(root, ()),
+            ("context7",),
+        )
 
     def test_rules_render_from_one_lean_source_with_cursor_metadata(self) -> None:
         outputs = expected_rule_outputs()

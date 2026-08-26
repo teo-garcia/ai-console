@@ -40,7 +40,57 @@ class RepoEntry:
     name: str
     path: Path
     ruleset: str
-    mcp_profile: str
+    mcp_profiles: tuple[str, ...]
+
+
+def _valid_mcp_profiles(root: Path) -> tuple[str, ...]:
+    canonical = load_json(root / "mcp/canonical.json")
+    profiles = canonical.get("profiles")
+    if not isinstance(profiles, dict) or not all(
+        isinstance(name, str) and isinstance(value, dict)
+        for name, value in profiles.items()
+    ):
+        raise ConfigError("canonical profiles must be an object")
+    return tuple(profiles)
+
+
+def _profile_selection(
+    value: dict[str, Any],
+    fallback: tuple[str, ...],
+    valid_profiles: tuple[str, ...],
+    context: str,
+) -> tuple[str, ...]:
+    has_plural = "mcpProfiles" in value
+    has_legacy = "mcpProfile" in value
+    if has_plural and has_legacy:
+        raise ConfigError(f"{context} cannot define both mcpProfiles and mcpProfile")
+    if not has_plural and not has_legacy:
+        return fallback
+
+    raw = value["mcpProfiles"] if has_plural else value["mcpProfile"]
+    if has_plural:
+        if not isinstance(raw, list) or not all(isinstance(item, str) for item in raw):
+            raise ConfigError(f"invalid mcpProfiles for {context}; expected a string array")
+        selected = raw
+    else:
+        if not isinstance(raw, str):
+            raise ConfigError(f"invalid mcpProfile for {context}; expected a string")
+        selected = [] if raw == "lean" else [raw]
+
+    if "lean" in selected:
+        raise ConfigError(f"invalid mcpProfiles for {context}; use [] instead of 'lean'")
+    if len(selected) != len(set(selected)):
+        raise ConfigError(f"duplicate mcpProfiles for {context}")
+    unknown = sorted(set(selected) - set(valid_profiles))
+    if unknown:
+        key = "mcpProfiles" if has_plural else "mcpProfile"
+        raise ConfigError(
+            f"invalid {key} {unknown!r} for {context}; "
+            f"expected values from {', '.join(valid_profiles)}"
+        )
+
+    requested = set(selected)
+    return tuple(name for name in valid_profiles if name in requested)
 
 
 def load_repo_entries(
@@ -72,7 +122,10 @@ def load_repo_entries(
             raise ConfigError(f"paths must be a string map in {selected_local}")
         local_paths = raw_paths
 
-    valid_profiles = {"lean", "browser", "codebase", "memory", "semantic", "ops"}
+    valid_profiles = _valid_mcp_profiles(root)
+    default_profiles = _profile_selection(
+        defaults, (), valid_profiles, "registry defaults"
+    )
     entries: list[RepoEntry] = []
     raw_entries = data.get("repos", [])
     if not isinstance(raw_entries, list):
@@ -95,13 +148,8 @@ def load_repo_entries(
                 f"copy registry/repos.local.example.json to {selected_local}"
             )
         ruleset = raw.get("ruleset", defaults.get("ruleset", "core"))
-        profile = raw.get("mcpProfile", defaults.get("mcpProfile", "lean"))
+        profiles = _profile_selection(raw, default_profiles, valid_profiles, repr(name))
         if not isinstance(ruleset, str):
             raise ConfigError(f"invalid ruleset for {name!r}")
-        if profile not in valid_profiles:
-            raise ConfigError(
-                f"invalid mcpProfile {profile!r} for {name!r}; "
-                f"expected one of {', '.join(sorted(valid_profiles))}"
-            )
-        entries.append(RepoEntry(name, expand_path(bound_path), ruleset, profile))
+        entries.append(RepoEntry(name, expand_path(bound_path), ruleset, profiles))
     return entries

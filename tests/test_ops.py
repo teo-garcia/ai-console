@@ -13,6 +13,7 @@ from ai_console.ops import (
     apply_repos,
     backup_global,
     merge_claude_config,
+    merge_claude_settings,
     merge_codex_config,
     merge_hook_config,
     restore_backup,
@@ -160,6 +161,34 @@ url = \"stale\"
         self.assertIn("$HOME/.ai-console", starts[1]["command"])
         self.assertEqual(len(merged["hooks"]["sessionEnd"]), 1)
 
+    def test_claude_settings_merge_adds_safe_default_and_preserves_user_rules(self) -> None:
+        existing = {
+            "theme": "dark",
+            "permissions": {"allow": ["Bash(git status *)"]},
+            "hooks": {
+                "SessionStart": [
+                    {"hooks": [{"command": "ai-console-lifecycle brief claude"}]}
+                ]
+            },
+        }
+        baseline = {
+            "permissions": {
+                "defaultMode": "auto",
+                "ask": ["Bash(git push *)"],
+                "deny": ["Read(.env)"],
+            },
+            "hooks": {"SessionStart": [], "Stop": [], "SessionEnd": []},
+        }
+
+        merged = merge_claude_settings(existing, baseline)
+
+        self.assertEqual(merged["theme"], "dark")
+        self.assertEqual(merged["permissions"]["defaultMode"], "auto")
+        self.assertEqual(merged["permissions"]["allow"], ["Bash(git status *)"])
+        self.assertEqual(merged["permissions"]["ask"], ["Bash(git push *)"])
+        self.assertEqual(merged["permissions"]["deny"], ["Read(.env)"])
+        self.assertEqual(merged["hooks"]["SessionStart"], [])
+
 
 class RepoApplyTests(unittest.TestCase):
     def test_profile_is_linked_for_all_clients(self) -> None:
@@ -168,6 +197,9 @@ class RepoApplyTests(unittest.TestCase):
             root = copy_template_tree(temporary_root / "console")
             repo = temporary_root / "repo"
             repo.mkdir()
+            (repo / ".claude").mkdir()
+            legacy_rules = repo / ".claude/rules"
+            legacy_rules.symlink_to(root / "rulesets/core/claude/rules")
             registry, local = make_registry(temporary_root, repo, "semantic")
 
             apply_repos(root, registry_path=registry, local_path=local)
@@ -181,6 +213,59 @@ class RepoApplyTests(unittest.TestCase):
             for destination, source in expected.items():
                 self.assertTrue(destination.is_symlink(), destination)
                 self.assertEqual(Path(os.readlink(destination)), source)
+            self.assertFalse(legacy_rules.is_symlink())
+
+    def test_additive_profiles_render_and_link_composed_configs(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            temporary_root = Path(temporary)
+            root = copy_template_tree(temporary_root / "console")
+            repo = temporary_root / "repo"
+            repo.mkdir()
+            registry, local = make_registry(
+                temporary_root, repo, ["semantic", "browser"]
+            )
+
+            apply_repos(root, registry_path=registry, local_path=local)
+
+            codex_source = (
+                root / "mcp/composed/browser+semantic/codex.config.toml"
+            )
+            self.assertEqual(
+                Path(os.readlink(repo / ".codex/config.toml")), codex_source
+            )
+            content = codex_source.read_text(encoding="utf-8")
+            self.assertIn("[mcp_servers.chrome-devtools]", content)
+            self.assertIn("[mcp_servers.serena]", content)
+
+            for destination in (
+                repo / ".cursor/mcp.json",
+                repo / ".mcp.json",
+                repo / "opencode.jsonc",
+            ):
+                self.assertTrue(destination.is_symlink(), destination)
+
+    def test_additive_profile_dry_run_does_not_write_composed_configs(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            temporary_root = Path(temporary)
+            root = copy_template_tree(temporary_root / "console")
+            repo = temporary_root / "repo"
+            repo.mkdir()
+            registry, local = make_registry(
+                temporary_root, repo, ["browser", "semantic"]
+            )
+
+            runner = apply_repos(
+                root,
+                dry_run=True,
+                registry_path=registry,
+                local_path=local,
+            )
+
+            self.assertFalse((root / "mcp/composed").exists())
+            self.assertFalse((repo / ".codex/config.toml").exists())
+            self.assertTrue(
+                any("would link" in message for message in runner.messages)
+            )
 
 
 class GlobalApplyTests(unittest.TestCase):
@@ -208,6 +293,14 @@ class GlobalApplyTests(unittest.TestCase):
             (home / ".claude/settings.json").write_text(
                 json.dumps({"theme": "dark"}), encoding="utf-8"
             )
+            retired_launcher = home / ".ai-console/bin/ai-console-lifecycle"
+            retired_launcher.parent.mkdir(parents=True)
+            retired_launcher.symlink_to(PROJECT_ROOT / "scripts/ai-console-lifecycle")
+            retired_plugin = home / ".config/opencode/plugins/ai-console-lifecycle.js"
+            retired_plugin.parent.mkdir(parents=True)
+            retired_plugin.symlink_to(
+                PROJECT_ROOT / "hooks/opencode/ai-console-lifecycle.js"
+            )
 
             apply_global(PROJECT_ROOT, home)
 
@@ -226,12 +319,17 @@ class GlobalApplyTests(unittest.TestCase):
                 any("herdr" in json.dumps(item) for item in cursor_hooks["hooks"]["sessionStart"])
             )
             self.assertEqual(claude_settings["theme"], "dark")
+            self.assertEqual(claude_settings["permissions"]["defaultMode"], "auto")
+            self.assertIn(
+                "Bash(git push *)", claude_settings["permissions"]["ask"]
+            )
+            self.assertFalse(retired_launcher.exists())
+            self.assertFalse(retired_plugin.exists())
             for client_path in (
                 home / ".codex/agents/reviewer.toml",
                 home / ".cursor/agents/reviewer.md",
                 home / ".claude/agents/reviewer.md",
                 home / ".config/opencode/agents/reviewer.md",
-                home / ".ai-console/bin/ai-console-lifecycle",
             ):
                 self.assertTrue(client_path.is_symlink(), client_path)
 

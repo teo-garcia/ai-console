@@ -1,18 +1,19 @@
 # ai-console
 
-A portable control plane for Codex, Cursor, Claude Code, and OpenCode. It keeps
-the always-on surface small, renders client configs from canonical sources,
-installs native lifecycle and agent layers, and makes ruleset changes testable.
+A portable, deliberately small control plane for Codex, Cursor, Claude Code,
+and OpenCode. It keeps shared safety rules testable while leaving models,
+verbosity, native tools, plugins, and ordinary permissions to each client.
 
 ## Design
 
-- One lean universal rules source, rendered into each client’s native format.
-- One global MCP server (Context7) plus one focused project profile at a time.
+- One universal rules source, rendered into each client’s native format.
+- One lightweight global MCP server (Context7); optional servers stay off.
 - A small general-purpose skill allowlist; deeper playbooks load on demand.
+- Installed native tools, skills, plugins, apps, and connectors activate on demand.
 - Tracked logical configuration separated from ignored machine-local bindings.
 - Dry-run, backup, restore, doctor, deterministic tests, and CI before mutation.
-- Privacy-safe lifecycle notes and human-reviewed learning candidates.
-- Client-native hooks, agents, rules metadata, and plugins where formats differ.
+- No ambient lifecycle hook or OpenCode plugin at session startup.
+- Client-native agents and rules metadata where formats differ.
 
 ## Quick start
 
@@ -22,7 +23,7 @@ cp registry/repos.local.example.json registry/repos.local.json
 ```
 
 Edit `registry/repos.local.json` with absolute paths for this machine. Keep
-logical repo names, rulesets, and profiles in the tracked `registry/repos.json`.
+logical repo names and rulesets in the tracked `registry/repos.json`.
 
 Then inspect and apply:
 
@@ -47,7 +48,8 @@ scripts/ai-console render [--check]
 scripts/ai-console plan global|repos|all
 scripts/ai-console apply global|repos [--dry-run] [--force]
 scripts/ai-console verify --scope templates|install|all [--json]
-scripts/ai-console doctor [--json]
+scripts/ai-console doctor [--client <client>] [--repo <name>] [--live] [--json]
+scripts/ai-console capabilities [--client <client>] [--repo <name>] [--live] [--json]
 scripts/ai-console backup
 scripts/ai-console restore <timestamp> [--force]
 scripts/ai-console route --task <class> --risk low|medium|high
@@ -70,10 +72,11 @@ Edit `rulesets/core/source.md`, then run `scripts/render`. The renderer produces
 - `rulesets/core/cursor/rules/core.mdc`, including required Cursor metadata
 - `rulesets/core/opencode/AGENTS.md`
 
-The core contains only universal trust, scope, safety, evidence, verification,
-and learning policy. Task procedures live in the `engineering-workflows` skill,
-whose router loads only the relevant reference for debugging, changes, reviews,
-migrations, or architecture decisions.
+The core contains universal trust, scope, safety, evidence, and verification
+policy plus two operational defaults: stay in the active workspace and prefer
+native client tools. The `engineering-workflows` skill is reserved for
+incidents, complex migrations, consequential architecture decisions, or an
+explicit playbook request. Routine coding work should not load it.
 
 Globally linked general-purpose skills:
 
@@ -98,41 +101,96 @@ scripts/toggle-skill disable improve
 Never install `garrytan/gstack` or `obra/superpowers` permanently. Pull either
 on demand and remove it after the task.
 
+## Capability resolution
+
+`config/capabilities.json` is a diagnostic inventory, not a runtime router. It
+reports native tools, plugins, MCP servers, and CLI fallbacks without activating
+them, starting a server, changing a profile, or promising current-session access.
+
+Inspect what a client can use now:
+
+```sh
+scripts/ai-console capabilities --client codex-desktop
+scripts/ai-console capabilities --client codex-cli --repo ai-console
+scripts/ai-console doctor --client codex-cli --repo ai-console
+```
+
+Ask for the outcome directly: “test the login flow” or “trace this symbol.” The
+rules tell each client to prefer its native capability. Explicit selectors and
+MCP profiles are opt-in overrides. `doctor --live` adds bounded TCP reachability
+checks; normal doctor and CI remain network-free.
+
+The resolver reports configuration separately from authentication, reachability,
+and current-session activation. It never installs or invokes a tool.
+
+Codex MCP output also renders least-surprising approval defaults from the same
+policy: Context7 uses `auto`, browser/code-navigation/index/memory servers use
+`writes`, and Datadog uses `prompt`. Capability validation fails if its declared
+approval or authentication policy drifts from the canonical MCP definition.
+
 ## MCP configuration
 
 `mcp/canonical.json` is the only hand-edited MCP definition. `scripts/render`
-generates global and profile configs for all four clients. Rendered files use
-portable executable names (`npx`, `uvx`) and contain no home-directory paths.
+generates global configs for all four clients. Only remote Context7 is global.
+Chrome DevTools, Codebase Memory, Serena, Basic Memory, and Datadog remain
+available as opt-in profiles, but none starts in an ordinary session. Serena's
+semantic profile relocates its home and per-project data under the user's cache
+directory, so activating it does not create repo-local `.serena` directories.
+Rendered files contain no fixed home-directory paths.
 
-| Profile | Capability | Intended use |
+MCP is only one capability layer. Native client tools, installed skills,
+plugins, apps, and connectors remain available on demand even when their tool
+schemas are not preloaded into a new session. Ask for the capability naturally;
+an explicit client selector such as `@Browser` is an override, not a requirement.
+
+| Internal bundle | Capability | Intended use |
 | --- | --- | --- |
-| `lean` | Context7 only | Default; current library documentation |
 | `browser` | Chrome DevTools | DOM, console, network, screenshots, performance |
 | `codebase` | Codebase Memory | Indexed structure and impact analysis |
 | `memory` | Basic Memory | Durable cross-client Markdown knowledge |
 | `semantic` | Serena | Symbol-aware navigation and refactoring |
 | `ops` | Datadog | Operational investigation and observability |
 
-Profiles are deliberately mutually exclusive. Choose the smallest profile that
-adds a distinct capability instead of composing a permanent tool catalog.
-
-Registry example:
+These bundles are explicit compatibility fallbacks, not prerequisites for native
+client tools. New repository entries should use no MCP overrides:
 
 ```json
 {
   "defaults": {
     "ruleset": "core",
-    "mcpProfile": "lean"
+    "mcpProfiles": []
   },
   "repos": [
     {
       "name": "my-service",
       "ruleset": "core",
-      "mcpProfile": "codebase"
+      "mcpProfiles": []
     }
   ]
 }
 ```
+
+Legacy `mcpProfile` and `mcpProfiles` keys are still accepted for existing
+installations. Duplicate, unknown, or mixed singular/plural selections fail
+before anything is applied. Leave `mcpProfiles` empty unless a repository
+explicitly needs one optional MCP fallback.
+
+For backwards compatibility, non-empty selections still render portable client
+configs under the ignored `mcp/composed/` cache. Applying repositories also
+removes the obsolete managed `.claude/rules` link; `CLAUDE.md` remains the
+canonical Claude instruction file.
+
+Client implementations intentionally differ:
+
+| Client | Native path |
+| --- | --- |
+| Codex | `codex plugin`, `/plugins`, `--search`, Browser/Chrome/Computer Use plugins, and built-in subagents |
+| Claude Code | Web tools, `--chrome`, `/agents`, `claude plugin`, and classifier-backed `auto` permissions |
+| Cursor Agent | Built-in code/web tools, `cursor-agent plugin`, `--auto-review`, optional sandbox, and explicit `--worktree` |
+| OpenCode | Built-in web/LSP/skills/agents and `opencode plugin <module>`; there is no `/plugin` slash command |
+
+Worktrees and sandboxes are opt-in. The shared rules do not move ordinary work
+out of the active checkout merely to use a subagent or tool.
 
 Local binding, stored only in ignored `registry/repos.local.json`:
 
@@ -147,10 +205,14 @@ Local binding, stored only in ignored `registry/repos.local.json`:
 The verifier scans canonical, global, and every profile output for machine home
 paths and fails on generated drift.
 
+Profiles are compatibility packaging, not a prerequisite the user must name in
+their prompt. Bind a profile only for repositories that actually need its MCP
+integration; otherwise each client should prefer its native capability.
+
 ### Datadog authentication
 
-The `ops` profile targets Datadog US5. OAuth credentials remain client-local and
-are never committed:
+Datadog is not ambient. If the `ops` profile is deliberately selected,
+the endpoint targets US5 and OAuth credentials remain client-local:
 
 ```sh
 codex mcp login datadog
@@ -160,31 +222,20 @@ cursor-agent mcp login datadog
 Change the endpoint in `mcp/canonical.json` before rendering if a different
 Datadog site is required.
 
-## Lifecycle and learning
+## Permissions and lifecycle
 
-`apply-global` installs a small launcher at
-`~/.ai-console/bin/ai-console-lifecycle` and merges native adapters:
+`apply-global` sets Claude Code's user-level permission mode to `auto`. Claude's
+safety classifier handles routine local actions while explicit `ask` rules keep
+human checkpoints for pushes, PR/issue creation, destructive shell commands,
+Terraform apply/destroy, and Kubernetes apply/delete. Explicit `deny` rules
+protect common environment, secret, SSH, and AWS credential paths. Existing
+user permission rules are preserved.
 
-- Codex: `~/.codex/hooks.json`
-- Claude Code: `~/.claude/settings.json`
-- Cursor: `~/.cursor/hooks.json`
-- OpenCode: `~/.config/opencode/plugins/ai-console-lifecycle.js`
-
-Startup context is capped at 25 lines and contains only repository facts:
-branch, dirty-file summary, recent commits, and the previous captured lifecycle
-event. Hook failures are advisory and fail open.
-
-Session captures live under `~/.ai-console/sessions/` with mode `0600`. They do
-not copy prompts, transcripts, tool output, or full assistant messages. A Stop
-hook extracts only a line explicitly formatted as:
-
-```text
-AI-CONSOLE-CORRECTION: stable correction to review
-```
-
-Corrections can also be recorded manually. `learn draft` groups exact normalized
-repeats and writes a review checklist under `~/.ai-console/drafts/`; it never
-edits rules, skills, hooks, tests, or MCP configuration and never commits.
+AI-console lifecycle hooks are disabled by default. `apply-global` removes its
+old SessionStart/Stop/SessionEnd entries, launcher link, and OpenCode lifecycle
+plugin while preserving unrelated hooks and plugins. The `learn` and lifecycle
+scripts remain available for explicit operator use, but they do not run when a
+client starts.
 
 ## Evaluations
 
@@ -218,9 +269,11 @@ reasoning, budget, and checkpoint requirements. Resolve those tiers to current
 models in the active client. High-risk routes always require a human checkpoint;
 evaluation routes require fixed settings for both variants.
 
-The stable canonical rules prefix plus separately injected volatile brief is
-designed to support client prompt caching. Cache benefit remains a measurement,
-not an assumption; use repeated-run latency or client-reported metrics.
+Model, reasoning, effort, and verbosity preferences remain native user settings.
+For example, Codex supports `model_verbosity`, but AI-console does not overwrite
+it or the existing model selection. Codex multi-agent is enabled by default in
+current releases; the shared rules now request delegation when work is genuinely
+parallel instead of forcing it for every task.
 
 ## Backup and restore
 
@@ -249,17 +302,18 @@ scripts/verify --scope install
 
 The standard-library test suite covers canonical rendering, portability,
 registry binding, dry-run immutability, merge preservation, all-client profile
-links, lifecycle privacy, learning drafts, native agents, routing, and
-backup/restore round trips. `.github/workflows/verify.yml` runs the same core
-checks on pushes and pull requests.
+links, disabled startup integrations, native agents, routing, and backup/restore
+round trips. `.github/workflows/verify.yml` runs the same core checks on pushes
+and pull requests.
 
-Codex hook commands require one-time trust after their definition changes; use
-`/hooks` to review them. Relevant native references:
+Relevant native references:
 
 - [Codex hooks](https://learn.chatgpt.com/docs/hooks)
 - [Codex subagents](https://learn.chatgpt.com/docs/agent-configuration/subagents)
 - [Claude Code hooks](https://code.claude.com/docs/en/hooks)
 - [Claude Code subagents](https://code.claude.com/docs/en/sub-agents)
+- [Claude Code permissions](https://code.claude.com/docs/en/permissions)
+- [Cursor Agent permissions](https://docs.cursor.com/cli/reference/permissions)
 - [OpenCode plugins](https://opencode.ai/docs/plugins/)
 - [OpenCode agents](https://opencode.ai/docs/agents)
 

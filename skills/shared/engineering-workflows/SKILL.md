@@ -1,11 +1,11 @@
 ---
 name: engineering-workflows
-description: Apply evidence-driven, technology-neutral workflows for bug fixes and incidents, feature implementation and refactoring, code review, high-risk migrations, and consequential architecture decisions. Use when a software task needs a repeatable discovery, execution, risk, or verification playbook rather than framework-specific advice.
+description: Apply evidence-driven playbooks for incidents, complex or high-risk migrations, consequential architecture decisions, and explicitly requested structured reviews. Do not load for routine bug fixes, features, or refactors that can follow normal repository instructions directly.
 ---
 
 # Engineering Workflows
 
-Use only the reference matching the current task. Do not load every playbook.
+Use only the reference matching the current task. Do not load every playbook. Routine coding work should not load this skill.
 
 ## Route the task
 

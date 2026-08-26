@@ -1,18 +1,18 @@
 {
   "defaults": {
     "ruleset": "core",
-    "mcpProfile": "lean"
+    "mcpProfiles": []
   },
   "repos": [
     {
       "name": "ai-console",
       "ruleset": "core",
-      "mcpProfile": "lean"
+      "mcpProfiles": []
     },
     {
       "name": "teo-garcia",
       "ruleset": "core",
-      "mcpProfile": "lean"
+      "mcpProfiles": []
     }
   ]
 }

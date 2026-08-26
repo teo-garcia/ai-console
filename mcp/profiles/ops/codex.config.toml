@@ -2,3 +2,5 @@
 
 [mcp_servers.datadog]
 url = "https://mcp.us5.datadoghq.com/api/unstable/mcp-server/mcp"
+auth = "oauth"
+default_tools_approval_mode = "prompt"

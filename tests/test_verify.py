@@ -4,8 +4,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from ai_console.verify import verify_templates
-from tests.helpers import copy_template_tree
+from ai_console.verify import doctor, verify_templates
+from tests.helpers import copy_template_tree, write_json
 
 
 class TemplateVerificationTests(unittest.TestCase):
@@ -27,6 +27,41 @@ class TemplateVerificationTests(unittest.TestCase):
                     check.status == "fail"
                     and "machine-specific path" in check.message
                     and "semantic/extra.txt" in check.message
+                    for check in result.checks
+                ),
+                result.payload(),
+            )
+
+    def test_doctor_reports_effective_additive_mcp_capabilities(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = copy_template_tree(Path(temporary) / "console")
+            repo = Path(temporary) / "repo"
+            repo.mkdir()
+            write_json(
+                root / "registry/repos.json",
+                {
+                    "defaults": {"ruleset": "core", "mcpProfiles": []},
+                    "repos": [
+                        {
+                            "name": "fixture",
+                            "mcpProfiles": ["semantic", "browser"],
+                        }
+                    ],
+                },
+            )
+            write_json(
+                root / "registry/repos.local.json",
+                {"paths": {"fixture": str(repo)}},
+            )
+
+            result = doctor(root)
+
+            self.assertTrue(
+                any(
+                    check.status == "ok"
+                    and "overrides=browser,semantic" in check.message
+                    and "effective servers=context7,chrome-devtools,serena"
+                    in check.message
                     for check in result.checks
                 ),
                 result.payload(),

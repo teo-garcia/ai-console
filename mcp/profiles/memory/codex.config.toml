@@ -4,3 +4,4 @@
 startup_timeout_sec = 30
 command = "uvx"
 args = ["--from", "basic-memory==0.22.1", "basic-memory", "mcp"]
+default_tools_approval_mode = "writes"

@@ -26,14 +26,21 @@ def write_json(path: Path, value: object) -> None:
     path.write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
 
 
-def make_registry(root: Path, repo: Path, profile: str = "lean") -> tuple[Path, Path]:
+def make_registry(
+    root: Path, repo: Path, profiles: str | list[str] = "lean"
+) -> tuple[Path, Path]:
     registry = root / "registry.json"
     local = root / "registry.local.json"
+    selection = (
+        {"mcpProfile": profiles}
+        if isinstance(profiles, str)
+        else {"mcpProfiles": profiles}
+    )
     write_json(
         registry,
         {
-            "defaults": {"ruleset": "core", "mcpProfile": "lean"},
-            "repos": [{"name": "fixture", "mcpProfile": profile}],
+            "defaults": {"ruleset": "core", "mcpProfiles": []},
+            "repos": [{"name": "fixture", **selection}],
         },
     )
     write_json(local, {"paths": {"fixture": str(repo)}})

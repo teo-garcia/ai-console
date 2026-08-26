@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from .config import ConfigError, ROOT, expand_path, load_json, load_repo_entries
+from .mcp import PROFILE_FILENAMES, profile_config_path, render_profile_config
 
 
 @dataclass
@@ -22,8 +23,10 @@ class Runner:
         self.messages.append(message)
         print(message)
 
-    def link(self, source: Path, destination: Path) -> None:
-        if not source.exists():
+    def link(
+        self, source: Path, destination: Path, *, source_planned: bool = False
+    ) -> None:
+        if not source.exists() and not (self.dry_run and source_planned):
             self.emit(f"skip: missing source {source}")
             return
         if destination.is_symlink() and Path(os.readlink(destination)) == source:
@@ -173,6 +176,42 @@ def merge_hook_config(
     return result
 
 
+def merge_claude_settings(
+    existing: dict[str, Any], baseline: dict[str, Any]
+) -> dict[str, Any]:
+    """Merge managed Claude hooks and permissions without dropping user rules."""
+    result = merge_hook_config(existing, baseline)
+    baseline_permissions = baseline.get("permissions")
+    if not isinstance(baseline_permissions, dict):
+        raise ConfigError("Claude settings baseline requires a permissions object")
+    current_permissions = existing.get("permissions")
+    permissions = (
+        dict(current_permissions) if isinstance(current_permissions, dict) else {}
+    )
+    default_mode = baseline_permissions.get("defaultMode")
+    if not isinstance(default_mode, str):
+        raise ConfigError("Claude settings baseline requires permissions.defaultMode")
+    permissions["defaultMode"] = default_mode
+    for rule_kind in ("allow", "ask", "deny"):
+        managed_rules = baseline_permissions.get(rule_kind, [])
+        if not isinstance(managed_rules, list) or not all(
+            isinstance(rule, str) for rule in managed_rules
+        ):
+            raise ConfigError(
+                f"Claude settings permissions.{rule_kind} must be a string array"
+            )
+        existing_rules = permissions.get(rule_kind, [])
+        if not isinstance(existing_rules, list) or not all(
+            isinstance(rule, str) for rule in existing_rules
+        ):
+            raise ConfigError(
+                f"installed Claude permissions.{rule_kind} must be a string array"
+            )
+        permissions[rule_kind] = list(dict.fromkeys([*existing_rules, *managed_rules]))
+    result["permissions"] = permissions
+    return result
+
+
 def _link_skill(runner: Runner, source: Path, skills_dir: Path) -> None:
     if not (source / "SKILL.md").is_file():
         runner.emit(f"skip: missing skill {source / 'SKILL.md'}")
@@ -201,6 +240,11 @@ def _remove_managed_non_global_skills(
                 continue
             runner.unlink(candidate)
             break
+
+
+def _unlink_exact_link(runner: Runner, destination: Path, source: Path) -> None:
+    if destination.is_symlink() and Path(os.readlink(destination)) == source:
+        runner.unlink(destination)
 
 
 def apply_global(
@@ -294,8 +338,11 @@ def apply_global(
     runner.link(root / "mcp/cursor.mcp.json", target("cursor", "mcpConfig"))
     runner.link(root / "mcp/opencode.jsonc", target("opencode", "mcpConfig"))
 
-    launcher = active_home / ".ai-console/bin/ai-console-lifecycle"
-    runner.link(root / "scripts/ai-console-lifecycle", launcher)
+    _unlink_exact_link(
+        runner,
+        active_home / ".ai-console/bin/ai-console-lifecycle",
+        root / "scripts/ai-console-lifecycle",
+    )
     for client, key, baseline_path in (
         ("codex", "hooksConfig", root / "hooks/codex/hooks.json"),
         ("cursor", "hooksConfig", root / "hooks/cursor/hooks.json"),
@@ -304,11 +351,16 @@ def apply_global(
         destination = target(client, key)
         existing = load_json(destination) if destination.exists() else {}
         baseline = load_json(baseline_path)
-        merged = merge_hook_config(existing, baseline)
+        merged = (
+            merge_claude_settings(existing, baseline)
+            if client == "claude"
+            else merge_hook_config(existing, baseline)
+        )
         runner.write(destination, json.dumps(merged, indent=2) + "\n", backup=True)
-    runner.link(
-        root / "hooks/opencode/ai-console-lifecycle.js",
+    _unlink_exact_link(
+        runner,
         target("opencode", "pluginsDir") / "ai-console-lifecycle.js",
+        root / "hooks/opencode/ai-console-lifecycle.js",
     )
     agent_extensions = {
         "codex": ".toml",
@@ -323,15 +375,21 @@ def apply_global(
     return runner
 
 
-def _unlink_managed_mcp(runner: Runner, root: Path, destination: Path) -> None:
+def _unlink_managed_link(
+    runner: Runner, destination: Path, managed_root: Path
+) -> None:
     if not destination.is_symlink():
         return
     target = Path(os.readlink(destination))
     try:
-        target.relative_to(root / "mcp")
+        target.relative_to(managed_root)
     except ValueError:
         return
     runner.unlink(destination)
+
+
+def _unlink_managed_mcp(runner: Runner, root: Path, destination: Path) -> None:
+    _unlink_managed_link(runner, destination, root / "mcp")
 
 
 def apply_repos(
@@ -367,6 +425,11 @@ def apply_repos(
             root / f"rulesets/{entry.ruleset}/claude/CLAUDE.md",
             repo / target("claude", "rules"),
         )
+        _unlink_managed_link(
+            runner,
+            repo / ".claude/rules",
+            root / f"rulesets/{entry.ruleset}/claude/rules",
+        )
         if opencode_rules == codex_rules:
             runner.emit(f"shared: {repo / codex_rules} is used by Codex and OpenCode")
         else:
@@ -376,21 +439,20 @@ def apply_repos(
             )
 
         _unlink_managed_mcp(runner, root, repo / "mcp.json")
-        profile_files = {
-            "codex": "codex.config.toml",
-            "cursor": "cursor.mcp.json",
-            "claude": "claude.mcp.json",
-            "opencode": "opencode.jsonc",
-        }
-        for client, filename in profile_files.items():
+        for client in PROFILE_FILENAMES:
             destination = repo / target(client, "mcpConfig")
-            if entry.mcp_profile == "lean":
+            if not entry.mcp_profiles:
                 _unlink_managed_mcp(runner, root, destination)
-            else:
-                runner.link(
-                    root / "mcp/profiles" / entry.mcp_profile / filename,
-                    destination,
+                continue
+            source = profile_config_path(root, entry.mcp_profiles, client)
+            source_planned = False
+            if len(entry.mcp_profiles) > 1:
+                runner.write(
+                    source,
+                    render_profile_config(root, entry.mcp_profiles, client),
                 )
+                source_planned = True
+            runner.link(source, destination, source_planned=source_planned)
     return runner
 
 

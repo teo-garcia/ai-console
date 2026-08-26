@@ -1,16 +1,10 @@
 {
   "mcpServers": {
     "serena": {
-      "command": "uvx",
+      "command": "/bin/sh",
       "args": [
-        "-p",
-        "3.13",
-        "--from",
-        "git+https://github.com/oraios/serena@95583663272ddf5d6e07ae6b99aeb05da3e59fdf",
-        "serena",
-        "start-mcp-server",
-        "--project-from-cwd",
-        "--context=ide"
+        "-c",
+        "case \"$XDG_CACHE_HOME\" in /*) serena_home=\"$XDG_CACHE_HOME/ai-console/serena\" ;; *) serena_home=\"$HOME/.cache/ai-console/serena\" ;; esac; export SERENA_HOME=\"$serena_home\"; umask 077; mkdir -p \"$serena_home\"; serena_config=\"$serena_home/serena_config.yml\"; if [ ! -f \"$serena_config\" ]; then printf 'projects: []\\nproject_serena_folder_location: \"%s/projects/$projectDir\"\\n' \"$serena_home\" > \"$serena_config\"; fi; exec uvx -p 3.13 --from git+https://github.com/oraios/serena@95583663272ddf5d6e07ae6b99aeb05da3e59fdf serena start-mcp-server --project-from-cwd --enable-web-dashboard false --open-web-dashboard false --enable-gui-log-window false --context=ide"
       ]
     }
   }

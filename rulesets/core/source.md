@@ -29,13 +29,19 @@
 - For high-risk work, also state rollback or migration strategy, affected contracts, and pre/post checks.
 - Keep diffs cohesive, local, reversible, and free of unrelated refactors.
 - Prefer root-cause fixes and existing conventions. Do not add dependencies, network calls, schemas, jobs, or public API changes without explicit justification.
-- Use the `engineering-workflows` skill for bug fixes, incidents, features, refactors, reviews, migrations, or consequential architecture decisions.
+- Work in the active workspace by default. Use a worktree, container, or other isolated copy only when the user asks, parallel writes require it, or a concrete risk justifies it.
+- Delegate independent read-heavy work to subagents when parallelism materially improves speed or quality. Keep write ownership separate and do not isolate work merely to use a subagent.
+- Use the `engineering-workflows` skill only for incidents, complex or high-risk migrations, consequential architecture decisions, or an explicit request for a playbook. Routine fixes and features do not need it.
 
 ## Evidence and tools
 
 - Use tools to reduce a specific uncertainty. Prefer authoritative local source, runtime output, tests, lockfiles, and installed help.
 - Use current official documentation for version-sensitive or freshness-sensitive claims.
-- Prefer the smallest capable tool surface. The global MCP baseline is Context7; project profiles may select one focused capability: browser, codebase, memory, semantic, or ops.
+- Treat native tools, installed skills, plugins, apps or connectors, and MCP servers as distinct capability layers.
+- Infer the needed capability from the task and invoke it naturally. Do not require the user to name a plugin, choose a profile, or restart a conversation for an already configured capability.
+- Prefer each client's native tools and installed plugins before MCP: Codex Browser, Chrome, and Computer Use; Claude Web and Chrome; Cursor's built-in code, web, and plugin tools; and OpenCode's web, LSP, skills, and agents.
+- Use configured MCP only when the native client lacks the capability or the task explicitly needs that integration. Do not start optional MCP servers ambiently.
+- Ask only at authentication, permission, or consequential action boundaries required by the active capability.
 - If a configured capability is unavailable, say so briefly and use the safest approved fallback.
 - Cross-check surprising output and summarize its implication instead of dumping logs.
 

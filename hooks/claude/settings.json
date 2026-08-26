@@ -1,38 +1,30 @@
 {
-  "hooks": {
-    "SessionStart": [
-      {
-        "matcher": "startup|resume|compact",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "$HOME/.ai-console/bin/ai-console-lifecycle brief claude",
-            "timeout": 3
-          }
-        ]
-      }
+  "permissions": {
+    "defaultMode": "auto",
+    "ask": [
+      "Bash(git push *)",
+      "Bash(gh pr create *)",
+      "Bash(gh issue create *)",
+      "Bash(rm *)",
+      "Bash(git clean *)",
+      "Bash(git reset *)",
+      "Bash(terraform apply *)",
+      "Bash(terraform destroy *)",
+      "Bash(kubectl apply *)",
+      "Bash(kubectl delete *)"
     ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "$HOME/.ai-console/bin/ai-console-lifecycle capture claude stop",
-            "timeout": 3
-          }
-        ]
-      }
-    ],
-    "SessionEnd": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "$HOME/.ai-console/bin/ai-console-lifecycle capture claude session-end",
-            "timeout": 3
-          }
-        ]
-      }
+    "deny": [
+      "Read(.env)",
+      "Read(**/.env)",
+      "Read(**/.env.local)",
+      "Read(**/secrets/**)",
+      "Read(~/.ssh/**)",
+      "Read(~/.aws/**)"
     ]
+  },
+  "hooks": {
+    "SessionStart": [],
+    "Stop": [],
+    "SessionEnd": []
   }
 }

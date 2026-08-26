@@ -2,5 +2,6 @@
 /.serena
 /registry/repos.local.json
 /evals/runs
+/mcp/composed
 __pycache__/
 *.py[cod]

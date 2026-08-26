@@ -5,6 +5,11 @@ import json
 import sys
 from pathlib import Path
 
+from .capabilities import (
+    CAPABILITY_CLIENTS,
+    format_capability_report,
+    resolve_capabilities,
+)
 from .config import ConfigError, ROOT
 from .evals import parse_variants, ratings_template, run_eval, score_run, write_run
 from .lifecycle import draft_learning, record_correction
@@ -38,6 +43,25 @@ def build_parser() -> argparse.ArgumentParser:
 
     doctor_parser = subparsers.add_parser("doctor", help="diagnose local prerequisites")
     doctor_parser.add_argument("--json", action="store_true", dest="json_output")
+    doctor_parser.add_argument("--live", action="store_true")
+    doctor_parser.add_argument("--client", choices=CAPABILITY_CLIENTS, default="codex-desktop")
+    doctor_parser.add_argument("--repo")
+
+    capability_parser = subparsers.add_parser(
+        "capabilities", help="resolve capability implementations and fallbacks"
+    )
+    capability_parser.add_argument(
+        "--client", choices=CAPABILITY_CLIENTS, default="codex-desktop"
+    )
+    capability_parser.add_argument("--repo")
+    capability_parser.add_argument(
+        "--with-profile",
+        action="append",
+        default=[],
+        help="preview an additional temporary MCP profile",
+    )
+    capability_parser.add_argument("--live", action="store_true")
+    capability_parser.add_argument("--json", action="store_true", dest="json_output")
 
     subparsers.add_parser("backup", help="snapshot global installation")
     restore = subparsers.add_parser("restore", help="restore a global snapshot")
@@ -127,7 +151,34 @@ def main(argv: list[str] | None = None) -> int:
             template_result.checks.extend(install_result.checks)
             return _print_verifier(template_result, args.json_output)
         if args.command == "doctor":
-            return _print_verifier(doctor(ROOT), args.json_output)
+            return _print_verifier(
+                doctor(
+                    ROOT,
+                    client=args.client,
+                    repo_name=args.repo,
+                    live=args.live,
+                ),
+                args.json_output,
+            )
+        if args.command == "capabilities":
+            additional_profiles = tuple(
+                profile
+                for value in args.with_profile
+                for profile in value.split(",")
+                if profile
+            )
+            payload = resolve_capabilities(
+                ROOT,
+                client=args.client,
+                repo_name=args.repo,
+                additional_profiles=additional_profiles,
+                live=args.live,
+            )
+            if args.json_output:
+                print(json.dumps(payload, indent=2))
+            else:
+                print(format_capability_report(payload))
+            return 0
         if args.command == "backup":
             backup_global(ROOT)
             return 0

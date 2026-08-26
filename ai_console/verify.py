@@ -7,9 +7,23 @@ import tomllib
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+from .capabilities import load_capability_registry, resolve_capabilities
 from .config import ConfigError, ROOT, load_json, load_repo_entries
-from .mcp import expected_outputs, render_all
-from .ops import _managed_servers, merge_claude_config, merge_codex_config
+from .mcp import (
+    PROFILE_FILENAMES,
+    effective_server_names,
+    expected_outputs,
+    profile_config_path,
+    render_all,
+    render_profile_config,
+)
+from .ops import (
+    _managed_servers,
+    merge_claude_config,
+    merge_claude_settings,
+    merge_codex_config,
+    merge_hook_config,
+)
 from .rules import render_rules
 
 
@@ -66,12 +80,19 @@ def verify_templates(root: Path = ROOT) -> Verifier:
         root / "hooks/cursor/hooks.json",
         root / "hooks/opencode/ai-console-lifecycle.js",
         root / "config/model-policy.json",
+        root / "config/capabilities.json",
     ]
     for path in required:
         if path.exists():
             result.ok(f"exists {path.relative_to(root)}")
         else:
             result.fail(f"missing {path.relative_to(root)}")
+
+    try:
+        load_capability_registry(root)
+        result.ok("capability registry references valid clients, profiles, and tools")
+    except ConfigError as exc:
+        result.fail(str(exc))
 
     try:
         drift = render_all(root, check=True) + render_rules(root, check=True)
@@ -133,10 +154,6 @@ def verify_install(root: Path = ROOT, home: Path | None = None) -> Verifier:
         root / ".cursor/rules": root / "rulesets/core/cursor/rules",
         active_home / ".cursor/mcp.json": root / "mcp/cursor.mcp.json",
         active_home / ".config/opencode/opencode.jsonc": root / "mcp/opencode.jsonc",
-        active_home / ".ai-console/bin/ai-console-lifecycle": root
-        / "scripts/ai-console-lifecycle",
-        active_home / ".config/opencode/plugins/ai-console-lifecycle.js": root
-        / "hooks/opencode/ai-console-lifecycle.js",
     }
     skill_sources = {
         "engineering-workflows": root / "skills/shared/engineering-workflows",
@@ -197,20 +214,44 @@ def verify_install(root: Path = ROOT, home: Path | None = None) -> Verifier:
     except ConfigError as exc:
         result.fail(str(exc))
 
-    for hook_path in (
-        active_home / ".codex/hooks.json",
-        active_home / ".cursor/hooks.json",
-        active_home / ".claude/settings.json",
+    for hook_path, baseline_path, merge in (
+        (
+            active_home / ".codex/hooks.json",
+            root / "hooks/codex/hooks.json",
+            merge_hook_config,
+        ),
+        (
+            active_home / ".cursor/hooks.json",
+            root / "hooks/cursor/hooks.json",
+            merge_hook_config,
+        ),
+        (
+            active_home / ".claude/settings.json",
+            root / "hooks/claude/settings.json",
+            merge_claude_settings,
+        ),
     ):
         try:
-            hook_text = hook_path.read_text(encoding="utf-8")
-            json.loads(hook_text)
-            if "ai-console-lifecycle" in hook_text:
-                result.ok(f"managed lifecycle hooks installed {hook_path}")
+            installed = load_json(hook_path)
+            baseline = load_json(baseline_path)
+            if merge(installed, baseline) == installed:
+                result.ok(f"managed native settings are current {hook_path}")
             else:
-                result.fail(f"managed lifecycle hooks missing {hook_path}")
-        except (OSError, ValueError) as exc:
-            result.fail(f"invalid installed hook config {hook_path}: {exc}")
+                result.fail(f"managed native settings have drift {hook_path}")
+        except ConfigError as exc:
+            result.fail(str(exc))
+
+    retired_links = {
+        active_home / ".ai-console/bin/ai-console-lifecycle": root
+        / "scripts/ai-console-lifecycle",
+        active_home / ".config/opencode/plugins/ai-console-lifecycle.js": root
+        / "hooks/opencode/ai-console-lifecycle.js",
+    }
+    for path, retired_target in retired_links.items():
+        if path.is_symlink() and Path(path.readlink()) == retired_target:
+            result.fail(f"retired startup integration remains {path}")
+        else:
+            result.ok(f"retired startup integration is inactive {path}")
 
     try:
         repo_entries = load_repo_entries(root)
@@ -238,24 +279,54 @@ def verify_install(root: Path = ROOT, home: Path | None = None) -> Verifier:
                 result.warn(f"repo rule is user-owned and was preserved {path}")
             else:
                 result.fail(f"repo rule missing {path}")
-        if entry.mcp_profile != "lean":
-            filenames = {
-                "codex": "codex.config.toml",
-                "cursor": "cursor.mcp.json",
-                "claude": "claude.mcp.json",
-                "opencode": "opencode.jsonc",
-            }
-            for client, filename in filenames.items():
+        legacy_claude_rules = repo / ".claude/rules"
+        if legacy_claude_rules.is_symlink():
+            try:
+                Path(legacy_claude_rules.readlink()).relative_to(
+                    root / f"rulesets/{entry.ruleset}/claude/rules"
+                )
+            except ValueError:
+                pass
+            else:
+                result.fail(f"legacy managed repo rule remains {legacy_claude_rules}")
+        if entry.mcp_profiles:
+            for client in PROFILE_FILENAMES:
                 destination = repo / repo_targets[client]["mcpConfig"]
-                expected = root / "mcp/profiles" / entry.mcp_profile / filename
-                if destination.is_symlink() and Path(destination.readlink()) == expected:
-                    result.ok(f"repo MCP profile installed {destination}")
-                else:
+                expected = profile_config_path(root, entry.mcp_profiles, client)
+                if not (
+                    destination.is_symlink()
+                    and Path(destination.readlink()) == expected
+                    and destination.exists()
+                ):
                     result.fail(f"repo MCP profile missing or unexpected {destination}")
+                    continue
+                if len(entry.mcp_profiles) > 1 and expected.read_text(
+                    encoding="utf-8"
+                ) != render_profile_config(root, entry.mcp_profiles, client):
+                    result.fail(f"repo MCP profile has drift {destination}")
+                else:
+                    result.ok(f"repo MCP profile installed {destination}")
+        else:
+            for client in PROFILE_FILENAMES:
+                destination = repo / repo_targets[client]["mcpConfig"]
+                if not destination.is_symlink():
+                    continue
+                try:
+                    Path(destination.readlink()).relative_to(root / "mcp")
+                except ValueError:
+                    continue
+                result.fail(f"unexpected managed repo MCP profile {destination}")
     return result
 
 
-def doctor(root: Path = ROOT) -> Verifier:
+def doctor(
+    root: Path = ROOT,
+    home: Path | None = None,
+    *,
+    client: str = "codex-desktop",
+    repo_name: str | None = None,
+    live: bool = False,
+) -> Verifier:
     result = verify_templates(root)
     for command in ("git", "python3", "npx", "uvx"):
         if shutil.which(command):
@@ -269,6 +340,57 @@ def doctor(root: Path = ROOT) -> Verifier:
                 result.ok(f"repo binding {entry.name} -> {entry.path}")
             else:
                 result.warn(f"repo path missing {entry.name} -> {entry.path}")
+            profiles = ",".join(entry.mcp_profiles) or "none"
+            servers = ",".join(effective_server_names(root, entry.mcp_profiles))
+            result.ok(
+                f"repo MCP capabilities {entry.name}: "
+                f"overrides={profiles}; effective servers={servers}"
+            )
+    except ConfigError as exc:
+        result.fail(str(exc))
+    try:
+        payload = resolve_capabilities(
+            root,
+            client=client,
+            repo_name=repo_name,
+            home=home,
+            live=live,
+        )
+        result.ok(
+            f"capability resolution client={client} "
+            f"repo={repo_name or '-'} "
+            f"overrides={','.join(payload['profiles']) or 'none'}"
+        )
+        for capability in payload["capabilities"]:
+            preferred = capability["preferred"]
+            states = ",".join(
+                f"{item['id']}={item['state']}"
+                for item in capability["implementations"]
+            )
+            if preferred:
+                result.ok(
+                    f"capability {capability['name']}: preferred={preferred}; {states}"
+                )
+            elif any(
+                item["state"] in {"available-profile", "planned-profile"}
+                for item in capability["implementations"]
+            ):
+                result.ok(
+                    f"capability {capability['name']}: inactive repository profile; "
+                    f"{states}"
+                )
+            else:
+                result.warn(f"capability {capability['name']}: unavailable; {states}")
+            if live:
+                for item in capability["implementations"]:
+                    if item["state"] == "configured" and item["reachable"] in {
+                        "unreachable",
+                        "invalid-url",
+                    }:
+                        result.warn(
+                            f"capability runtime unreachable "
+                            f"{capability['name']}/{item['id']}"
+                        )
     except ConfigError as exc:
         result.fail(str(exc))
     return result

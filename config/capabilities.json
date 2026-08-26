@@ -1,0 +1,295 @@
+{
+  "version": 1,
+  "clients": [
+    "codex-desktop",
+    "codex-cli",
+    "codex-ide",
+    "claude",
+    "cursor",
+    "opencode"
+  ],
+  "capabilities": {
+    "library-docs": {
+      "description": "Current library and framework documentation",
+      "risk": "read-only",
+      "activation": "global",
+      "implementations": [
+        {
+          "id": "context7",
+          "kind": "mcp",
+          "clients": [
+            "codex-desktop",
+            "codex-cli",
+            "codex-ide",
+            "claude",
+            "cursor",
+            "opencode"
+          ],
+          "mcpServer": "context7",
+          "approval": "auto",
+          "useWhen": "Version-sensitive library or framework API guidance"
+        }
+      ]
+    },
+    "public-research": {
+      "description": "Current public information with inspectable sources",
+      "risk": "read-only",
+      "activation": "lazy",
+      "implementations": [
+        {
+          "id": "web-search",
+          "kind": "native",
+          "clients": ["codex-desktop"],
+          "approval": "auto",
+          "useWhen": "Public facts, current information, citations, or direct page retrieval"
+        },
+        {
+          "id": "browser-plugin",
+          "kind": "plugin",
+          "clients": ["codex-desktop", "codex-cli"],
+          "pluginName": "browser",
+          "selector": "@Browser",
+          "approval": "writes",
+          "useWhen": "Research requires interaction with a rendered public page"
+        }
+      ]
+    },
+    "browser-testing": {
+      "description": "Inspect and exercise local or public web interfaces",
+      "risk": "interactive",
+      "activation": "lazy",
+      "implementations": [
+        {
+          "id": "browser-plugin",
+          "kind": "plugin",
+          "clients": ["codex-desktop", "codex-cli"],
+          "pluginName": "browser",
+          "selector": "@Browser",
+          "approval": "writes",
+          "useWhen": "Interactive local-page testing, screenshots, clicking, typing, or rendered-state verification"
+        },
+        {
+          "id": "chrome-devtools",
+          "kind": "mcp",
+          "clients": [
+            "codex-desktop",
+            "codex-cli",
+            "codex-ide",
+            "claude",
+            "cursor",
+            "opencode"
+          ],
+          "mcpServer": "chrome-devtools",
+          "profile": "browser",
+          "approval": "writes",
+          "useWhen": "CLI or IDE work needs DOM, console, network, CDP, or performance diagnostics"
+        }
+      ]
+    },
+    "signed-in-browser": {
+      "description": "Interact with the user's existing signed-in Chrome state",
+      "risk": "external-write",
+      "activation": "lazy",
+      "implementations": [
+        {
+          "id": "chrome-plugin",
+          "kind": "plugin",
+          "clients": ["codex-desktop", "codex-cli"],
+          "pluginName": "chrome",
+          "selector": "@Chrome",
+          "auth": "user-session",
+          "approval": "prompt",
+          "useWhen": "The task depends on existing tabs, cookies, extensions, or logged-in state"
+        }
+      ]
+    },
+    "code-navigation": {
+      "description": "Find code, trace symbols, and perform scoped refactors",
+      "risk": "write",
+      "activation": "on-demand",
+      "implementations": [
+        {
+          "id": "ripgrep",
+          "kind": "cli",
+          "clients": [
+            "codex-desktop",
+            "codex-cli",
+            "codex-ide",
+            "claude",
+            "cursor",
+            "opencode"
+          ],
+          "command": "rg",
+          "approval": "auto",
+          "useWhen": "Fast text, filename, caller, or configuration discovery"
+        },
+        {
+          "id": "serena",
+          "kind": "mcp",
+          "clients": [
+            "codex-desktop",
+            "codex-cli",
+            "codex-ide",
+            "claude",
+            "cursor",
+            "opencode"
+          ],
+          "mcpServer": "serena",
+          "profile": "semantic",
+          "approval": "writes",
+          "useWhen": "Symbol-aware navigation or refactoring is materially safer than text search"
+        }
+      ]
+    },
+    "architecture-analysis": {
+      "description": "Build an indexed structural and impact model of a codebase",
+      "risk": "read-only",
+      "activation": "on-demand",
+      "implementations": [
+        {
+          "id": "codebase-memory",
+          "kind": "mcp",
+          "clients": [
+            "codex-desktop",
+            "codex-cli",
+            "codex-ide",
+            "claude",
+            "cursor",
+            "opencode"
+          ],
+          "mcpServer": "codebase-memory",
+          "profile": "codebase",
+          "approval": "writes",
+          "useWhen": "A large unfamiliar repository needs persistent structure or impact analysis"
+        },
+        {
+          "id": "ripgrep",
+          "kind": "cli",
+          "clients": [
+            "codex-desktop",
+            "codex-cli",
+            "codex-ide",
+            "claude",
+            "cursor",
+            "opencode"
+          ],
+          "command": "rg",
+          "approval": "auto",
+          "useWhen": "A bounded source trace can answer the question without maintaining an index"
+        }
+      ]
+    },
+    "durable-memory": {
+      "description": "Reviewable cross-client project knowledge",
+      "risk": "write",
+      "activation": "on-demand",
+      "implementations": [
+        {
+          "id": "basic-memory",
+          "kind": "mcp",
+          "clients": [
+            "codex-desktop",
+            "codex-cli",
+            "codex-ide",
+            "claude",
+            "cursor",
+            "opencode"
+          ],
+          "mcpServer": "basic-memory",
+          "profile": "memory",
+          "approval": "writes",
+          "useWhen": "Long-running work benefits from explicit Markdown knowledge that humans can review"
+        }
+      ]
+    },
+    "observability": {
+      "description": "Investigate production telemetry and operational state",
+      "risk": "external-write",
+      "activation": "on-demand",
+      "implementations": [
+        {
+          "id": "datadog",
+          "kind": "mcp",
+          "clients": [
+            "codex-desktop",
+            "codex-cli",
+            "codex-ide",
+            "claude",
+            "cursor",
+            "opencode"
+          ],
+          "mcpServer": "datadog",
+          "profile": "ops",
+          "auth": "oauth",
+          "approval": "prompt",
+          "useWhen": "An authorized incident or operational question requires Datadog evidence"
+        }
+      ]
+    },
+    "github-workflow": {
+      "description": "Inspect and manage GitHub pull requests, issues, and CI",
+      "risk": "external-write",
+      "activation": "lazy",
+      "implementations": [
+        {
+          "id": "github-plugin",
+          "kind": "plugin",
+          "clients": ["codex-desktop", "codex-cli"],
+          "pluginName": "github",
+          "selector": "@GitHub",
+          "auth": "connector",
+          "approval": "writes",
+          "useWhen": "Private GitHub context or connector-backed PR, issue, and Actions workflows are needed"
+        },
+        {
+          "id": "gh-cli",
+          "kind": "cli",
+          "clients": [
+            "codex-desktop",
+            "codex-cli",
+            "codex-ide",
+            "claude",
+            "cursor",
+            "opencode"
+          ],
+          "command": "gh",
+          "auth": "cli-session",
+          "approval": "writes",
+          "useWhen": "A narrow GitHub CLI operation is more direct or the connector is unavailable"
+        },
+        {
+          "id": "git-cli",
+          "kind": "cli",
+          "clients": [
+            "codex-desktop",
+            "codex-cli",
+            "codex-ide",
+            "claude",
+            "cursor",
+            "opencode"
+          ],
+          "command": "git",
+          "approval": "writes",
+          "useWhen": "The task concerns only the local repository or ordinary Git transport"
+        }
+      ]
+    },
+    "desktop-control": {
+      "description": "Operate local macOS applications through visible UI",
+      "risk": "external-write",
+      "activation": "lazy",
+      "implementations": [
+        {
+          "id": "computer-use-plugin",
+          "kind": "plugin",
+          "clients": ["codex-desktop", "codex-cli"],
+          "pluginName": "computer-use",
+          "selector": "@Computer Use",
+          "auth": "os-permission",
+          "approval": "prompt",
+          "useWhen": "No purpose-built connector, API, or CLI can operate the required Mac application"
+        }
+      ]
+    }
+  }
+}
