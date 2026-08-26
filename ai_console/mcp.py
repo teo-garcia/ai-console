@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from .config import ConfigError, ROOT, load_json
+from .plugins import opencode_plugin_config, plugin_owned_mcp_servers
 
 
 CLIENTS = ("codex", "claude", "cursor", "opencode")
@@ -105,7 +106,12 @@ def _toml_server(name: str, server: dict[str, Any]) -> str:
 
 
 def render_client(
-    canonical: dict[str, Any], server_names: list[str], client: str, label: str
+    canonical: dict[str, Any],
+    server_names: list[str],
+    client: str,
+    label: str,
+    *,
+    client_config: dict[str, Any] | None = None,
 ) -> str:
     raw_servers = canonical.get("servers")
     if not isinstance(raw_servers, dict):
@@ -128,6 +134,13 @@ def render_client(
             "$schema": "https://opencode.ai/config.json",
             "mcp": {name: _opencode_server(server) for name, server in selected.items()},
         }
+        if client_config:
+            collisions = set(payload) & set(client_config)
+            if collisions:
+                raise ConfigError(
+                    f"OpenCode plugin config collides with generated keys: {sorted(collisions)}"
+                )
+            payload.update(copy.deepcopy(client_config))
         return json.dumps(payload, indent=2) + "\n"
     raise ConfigError(f"unsupported client: {client}")
 
@@ -152,7 +165,7 @@ def profile_server_names(
 
 
 def effective_server_names(
-    root: Path, profile_names: tuple[str, ...]
+    root: Path, profile_names: tuple[str, ...], *, client: str | None = None
 ) -> tuple[str, ...]:
     canonical = load_json(root / "mcp/canonical.json")
     global_config = canonical.get("global")
@@ -166,6 +179,9 @@ def effective_server_names(
             raise ConfigError("MCP server names must be strings")
         if name not in selected:
             selected.append(name)
+    if client is not None:
+        owned = plugin_owned_mcp_servers(client, root)
+        selected = [name for name in selected if name not in owned]
     return tuple(selected)
 
 
@@ -190,7 +206,11 @@ def render_profile_config(
     label = " + ".join(profile_names)
     return render_client(
         canonical,
-        profile_server_names(canonical, profile_names),
+        [
+            name
+            for name in profile_server_names(canonical, profile_names)
+            if name not in plugin_owned_mcp_servers(client, root)
+        ],
         client,
         f"{label} MCP profile set",
     )
@@ -212,8 +232,13 @@ def expected_outputs(root: Path = ROOT) -> dict[Path, str]:
         "opencode": root / "mcp/opencode.jsonc",
     }
     for client, path in global_paths.items():
+        owned = plugin_owned_mcp_servers(client, root)
         outputs[path] = render_client(
-            canonical, global_config["servers"], client, "lean global MCP baseline"
+            canonical,
+            [name for name in global_config["servers"] if name not in owned],
+            client,
+            "lean global MCP baseline",
+            client_config=opencode_plugin_config(root) if client == "opencode" else None,
         )
 
     profiles = canonical.get("profiles")
@@ -224,9 +249,10 @@ def expected_outputs(root: Path = ROOT) -> dict[Path, str]:
             raise ConfigError(f"profile {profile_name!r} requires servers array")
         for client, filename in PROFILE_FILENAMES.items():
             path = root / "mcp/profiles" / profile_name / filename
+            owned = plugin_owned_mcp_servers(client, root)
             outputs[path] = render_client(
                 canonical,
-                profile["servers"],
+                [name for name in profile["servers"] if name not in owned],
                 client,
                 f"{profile_name} MCP profile",
             )

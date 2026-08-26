@@ -6,5 +6,20 @@
       "url": "https://mcp.context7.com/mcp",
       "enabled": true
     }
+  },
+  "plugin": [
+    [
+      "opencode-goal-plugin@0.8.2",
+      {
+        "persistState": false
+      }
+    ]
+  ],
+  "command": {
+    "goal": {
+      "description": "Set a session-scoped goal and auto-continue until complete.",
+      "template": "$ARGUMENTS",
+      "agent": "build"
+    }
   }
 }

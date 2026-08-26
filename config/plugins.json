@@ -1,0 +1,118 @@
+{
+  "version": 1,
+  "policy": {
+    "precedence": ["native", "plugin", "mcp", "cli"],
+    "duplicateMcp": "prefer-plugin-and-disable-standalone",
+    "selection": "Install only a plugin that fills a native gap or adds useful skills, agents, hooks, or auth around an integration."
+  },
+  "mcpOwnership": {
+    "cursor": {
+      "context7": "context7-plugin"
+    }
+  },
+  "selected": {
+    "codex": [
+      {
+        "name": "browser",
+        "source": "openai-bundled",
+        "management": "runtime",
+        "activation": "lazy",
+        "capabilities": ["browser-testing"]
+      },
+      {
+        "name": "chrome",
+        "source": "openai-bundled",
+        "management": "runtime",
+        "activation": "lazy",
+        "capabilities": ["signed-in-browser"]
+      },
+      {
+        "name": "computer-use",
+        "source": "openai-bundled",
+        "management": "runtime",
+        "activation": "lazy",
+        "capabilities": ["desktop-control"]
+      },
+      {
+        "name": "github",
+        "source": "openai-curated",
+        "management": "marketplace",
+        "activation": "lazy",
+        "capabilities": ["github-workflow"]
+      }
+    ],
+    "claude": [
+      {
+        "name": "typescript-lsp",
+        "source": "claude-plugins-official",
+        "management": "marketplace",
+        "activation": "lazy",
+        "capabilities": ["semantic-code-intelligence"],
+        "requiresCommand": "typescript-language-server"
+      }
+    ],
+    "cursor": [
+      {
+        "name": "context7-plugin",
+        "source": "cursor-public",
+        "management": "marketplace",
+        "activation": "lazy",
+        "capabilities": ["library-docs"],
+        "replacesMcp": "context7"
+      }
+    ],
+    "opencode": [
+      {
+        "name": "opencode-goal-plugin",
+        "source": "npm",
+        "management": "generated",
+        "activation": "global",
+        "version": "0.8.2",
+        "capabilities": ["long-running-goal"]
+      }
+    ]
+  },
+  "capabilities": {
+    "goal": {
+      "description": "Keep one session working toward a verifiable objective across turns",
+      "contract": {
+        "start": "/goal <objective and stopping condition>",
+        "scope": "session",
+        "completion": "evidence-backed",
+        "repositoryState": false
+      },
+      "implementations": {
+        "codex": {
+          "kind": "native",
+          "command": "/goal",
+          "docs": "https://learn.chatgpt.com/use-cases/follow-goals"
+        },
+        "claude": {
+          "kind": "native",
+          "command": "/goal",
+          "docs": "https://code.claude.com/docs/en/goal"
+        },
+        "cursor": {
+          "kind": "native",
+          "command": "/goal",
+          "docs": "https://prod.cursor.com/docs/agent/overview"
+        },
+        "opencode": {
+          "kind": "npm",
+          "package": "opencode-goal-plugin",
+          "version": "0.8.2",
+          "source": "https://github.com/willytop8/OpenCode-goal-plugin",
+          "options": {
+            "persistState": false
+          },
+          "command": {
+            "name": "goal",
+            "description": "Set a session-scoped goal and auto-continue until complete.",
+            "template": "$ARGUMENTS",
+            "agent": "build"
+          }
+        }
+      }
+    }
+  }
+}

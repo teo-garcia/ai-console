@@ -14,7 +14,7 @@ from ai_console.capabilities import (
     load_capability_registry,
     resolve_capabilities,
 )
-from ai_console.config import ConfigError
+from ai_console.config import ConfigError, load_json
 from tests.helpers import copy_template_tree, write_json
 
 
@@ -87,7 +87,11 @@ class CapabilityResolutionTests(unittest.TestCase):
                         browser["implementations"][0]["session"], "unknown"
                     )
                     self.assertEqual(
-                        by_name["observability"]["implementations"][0]["state"],
+                        next(
+                            item
+                            for item in by_name["observability"]["implementations"]
+                            if item["id"] == "datadog"
+                        )["state"],
                         "available-profile",
                     )
                     self.assertEqual(
@@ -192,6 +196,11 @@ class CapabilityResolutionTests(unittest.TestCase):
                 home / ".cursor/plugins/local/review/.cursor-plugin/plugin.json",
                 {"name": "review", "version": "2.0.0"},
             )
+            write_json(
+                home
+                / ".cursor/plugins/cache/cursor-public/context7-plugin/revision/.claude-plugin/plugin.json",
+                {"name": "context7-plugin"},
+            )
             opencode_plugin = (
                 home / ".config/opencode/plugins/herdr-agent-state.js"
             )
@@ -199,12 +208,15 @@ class CapabilityResolutionTests(unittest.TestCase):
             opencode_plugin.write_text("export default {}\n", encoding="utf-8")
             write_json(
                 home / ".config/opencode/opencode.jsonc",
-                {"plugin": ["@scope/tools@3.0.0"]},
+                {"plugin": [["@scope/tools@3.0.0", {"enabled": True}]]},
             )
 
             self.assertIs(discover_claude_plugins(home)["linter"]["enabled"], True)
             self.assertEqual(
                 discover_cursor_plugins(home)["review"]["versions"], ["2.0.0"]
+            )
+            self.assertIs(
+                discover_cursor_plugins(home)["context7-plugin"]["enabled"], True
             )
             opencode = discover_opencode_plugins(home)
             self.assertIs(opencode["herdr-agent-state"]["enabled"], True)
@@ -235,9 +247,46 @@ class CapabilityResolutionTests(unittest.TestCase):
                 if item["name"] == "semantic-code-intelligence"
             )
             self.assertIsNone(semantic["preferred"])
-            self.assertEqual(semantic["previewPreferred"], "claude-lsp-host")
+            self.assertIsNone(semantic["previewPreferred"])
             self.assertEqual(
-                semantic["implementations"][0]["state"], "available-on-demand"
+                {item["state"] for item in semantic["implementations"]},
+                {"not-installed"},
+            )
+
+    def test_precedence_is_native_then_plugin_then_mcp_then_cli(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = copy_template_tree(Path(temporary) / "root")
+            home = Path(temporary) / "home"
+            self._install_plugin(home, "browser")
+            self._install_plugin(home, "datadog")
+            self._enable_plugins(home, "browser", "datadog")
+
+            canonical_path = root / "mcp/canonical.json"
+            canonical = load_json(canonical_path)
+            canonical["global"]["servers"].extend(["chrome-devtools", "datadog"])
+            write_json(canonical_path, canonical)
+
+            registry_path = root / "config/capabilities.json"
+            registry = load_json(registry_path)
+            browser = registry["capabilities"]["browser-testing"]
+            browser["implementations"].reverse()
+            write_json(registry_path, registry)
+
+            payload = resolve_capabilities(root, home=home)
+            by_name = {item["name"]: item for item in payload["capabilities"]}
+
+            self.assertEqual(
+                payload["preferencePolicy"], ["native", "plugin", "mcp", "cli"]
+            )
+            self.assertEqual(by_name["public-research"]["preferred"], "web-search")
+            self.assertEqual(
+                by_name["browser-testing"]["preferred"], "browser-plugin"
+            )
+            self.assertEqual(
+                by_name["observability"]["preferred"], "codex-datadog-plugin"
+            )
+            self.assertEqual(
+                by_name["observability"]["duplicateMcpServers"], ["datadog"]
             )
 
     def test_human_report_exposes_fallback_state(self) -> None:

@@ -15,6 +15,16 @@
       "activation": "global",
       "implementations": [
         {
+          "id": "cursor-context7-plugin",
+          "kind": "plugin",
+          "clients": ["cursor"],
+          "pluginName": "context7-plugin",
+          "selector": "/docs",
+          "supersedesMcp": "context7",
+          "approval": "auto",
+          "useWhen": "Cursor can isolate documentation lookup through the verified plugin's skill, command, and research subagent"
+        },
+        {
           "id": "context7",
           "kind": "mcp",
           "clients": [
@@ -198,12 +208,20 @@
           "useWhen": "Cursor can use its editor-backed semantic understanding and language tooling"
         },
         {
-          "id": "claude-lsp-host",
-          "kind": "native",
+          "id": "claude-typescript-lsp",
+          "kind": "plugin",
           "clients": ["claude"],
+          "pluginName": "typescript-lsp",
           "approval": "auto",
-          "requires": "language-specific Claude LSP plugin",
-          "useWhen": "Definitions, references, hover data, or diagnostics need a configured language server"
+          "useWhen": "TypeScript or JavaScript definitions, references, hover data, or diagnostics need the installed language server"
+        },
+        {
+          "id": "claude-pyright-lsp",
+          "kind": "plugin",
+          "clients": ["claude"],
+          "pluginName": "pyright-lsp",
+          "approval": "auto",
+          "useWhen": "Python definitions, references, hover data, or diagnostics need Pyright"
         },
         {
           "id": "opencode-lsp",
@@ -268,6 +286,46 @@
           "clients": ["opencode"],
           "approval": "writes",
           "useWhen": "A task can be delegated to an OpenCode subagent with its own model, tools, and permissions"
+        }
+      ]
+    },
+    "long-running-goal": {
+      "description": "Keep one session working toward a verifiable objective across turns",
+      "risk": "write",
+      "activation": "lazy",
+      "implementations": [
+        {
+          "id": "codex-goal",
+          "kind": "native",
+          "clients": ["codex-desktop", "codex-cli"],
+          "selector": "/goal",
+          "approval": "writes",
+          "useWhen": "Substantial Codex work has one measurable end state and a validation loop"
+        },
+        {
+          "id": "claude-goal",
+          "kind": "native",
+          "clients": ["claude"],
+          "selector": "/goal",
+          "approval": "writes",
+          "useWhen": "Claude should keep taking turns until a separate evaluator confirms the condition"
+        },
+        {
+          "id": "cursor-goal",
+          "kind": "native",
+          "clients": ["cursor"],
+          "selector": "/goal",
+          "approval": "writes",
+          "useWhen": "Cursor should pursue a long-lived objective until the measurable outcome is complete"
+        },
+        {
+          "id": "opencode-goal",
+          "kind": "plugin",
+          "clients": ["opencode"],
+          "pluginName": "opencode-goal-plugin",
+          "selector": "/goal",
+          "approval": "writes",
+          "useWhen": "OpenCode should auto-continue a guarded, evidence-gated goal without repository state"
         }
       ]
     },
@@ -403,6 +461,37 @@
       "risk": "external-write",
       "activation": "on-demand",
       "implementations": [
+        {
+          "id": "codex-datadog-plugin",
+          "kind": "plugin",
+          "clients": ["codex-desktop", "codex-cli"],
+          "pluginName": "datadog",
+          "selector": "@Datadog",
+          "supersedesMcp": "datadog",
+          "auth": "oauth",
+          "approval": "prompt",
+          "useWhen": "Codex can lazily use the curated Datadog connector instead of preloading a standalone MCP"
+        },
+        {
+          "id": "claude-datadog-plugin",
+          "kind": "plugin",
+          "clients": ["claude"],
+          "pluginName": "datadog",
+          "supersedesMcp": "datadog",
+          "auth": "oauth",
+          "approval": "prompt",
+          "useWhen": "The Datadog-maintained Claude bundle's skills and hooks justify its session overhead"
+        },
+        {
+          "id": "cursor-datadog-plugin",
+          "kind": "plugin",
+          "clients": ["cursor"],
+          "pluginName": "datadog",
+          "supersedesMcp": "datadog",
+          "auth": "oauth",
+          "approval": "prompt",
+          "useWhen": "Cursor can use its verified Datadog plugin, OAuth, and skills instead of a duplicate standalone MCP"
+        },
         {
           "id": "datadog",
           "kind": "mcp",

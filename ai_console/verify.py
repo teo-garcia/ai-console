@@ -26,6 +26,7 @@ from .ops import (
     merge_hook_config,
     merge_nested_config,
 )
+from .plugins import load_plugin_registry
 from .rules import render_rules
 
 
@@ -86,6 +87,7 @@ def verify_templates(root: Path = ROOT) -> Verifier:
         root / "status-lines/claude.sh",
         root / "config/model-policy.json",
         root / "config/capabilities.json",
+        root / "config/plugins.json",
     ]
     for path in required:
         if path.exists():
@@ -96,6 +98,12 @@ def verify_templates(root: Path = ROOT) -> Verifier:
     try:
         load_capability_registry(root)
         result.ok("capability registry references valid clients, profiles, and tools")
+    except ConfigError as exc:
+        result.fail(str(exc))
+
+    try:
+        load_plugin_registry(root)
+        result.ok("plugin registry maps standardized capabilities without repo state")
     except ConfigError as exc:
         result.fail(str(exc))
 
@@ -364,7 +372,12 @@ def doctor(
             else:
                 result.warn(f"repo path missing {entry.name} -> {entry.path}")
             profiles = ",".join(entry.mcp_profiles) or "none"
-            servers = ",".join(effective_server_names(root, entry.mcp_profiles))
+            mcp_client = "codex" if client.startswith("codex-") else client
+            servers = ",".join(
+                effective_server_names(
+                    root, entry.mcp_profiles, client=mcp_client
+                )
+            )
             result.ok(
                 f"repo MCP capabilities {entry.name}: "
                 f"overrides={profiles}; effective servers={servers}"
@@ -408,6 +421,11 @@ def doctor(
                 )
             else:
                 result.warn(f"capability {capability['name']}: unavailable; {states}")
+            if capability["duplicateMcpServers"]:
+                result.warn(
+                    f"capability {capability['name']}: plugin and standalone MCP "
+                    f"both active; disable {','.join(capability['duplicateMcpServers'])}"
+                )
             if live:
                 for item in capability["implementations"]:
                     if item["state"] == "configured" and item["reachable"] in {

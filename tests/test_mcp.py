@@ -34,6 +34,18 @@ class McpRenderingTests(unittest.TestCase):
 
         codex = outputs[Path(__file__).resolve().parent.parent / "mcp/codex.config.toml"]
         self.assertIn('default_tools_approval_mode = "auto"', codex)
+        cursor = json.loads(
+            outputs[Path(__file__).resolve().parent.parent / "mcp/cursor.mcp.json"]
+        )
+        self.assertNotIn("context7", cursor["mcpServers"])
+        opencode = json.loads(
+            outputs[Path(__file__).resolve().parent.parent / "mcp/opencode.jsonc"]
+        )
+        self.assertEqual(
+            opencode["plugin"],
+            [["opencode-goal-plugin@0.8.2", {"persistState": False}]],
+        )
+        self.assertIn("goal", opencode["command"])
         browser = outputs[
             Path(__file__).resolve().parent.parent
             / "mcp/profiles/browser/codex.config.toml"
@@ -87,6 +99,16 @@ class McpRenderingTests(unittest.TestCase):
         self.assertIn("[mcp_servers.chrome-devtools]", content)
         self.assertIn("[mcp_servers.serena]", content)
         self.assertNotIn("[mcp_servers.context7]", content)
+
+        opencode = json.loads(
+            render_profile_config(
+                Path(__file__).resolve().parent.parent,
+                ("browser", "semantic"),
+                "opencode",
+            )
+        )
+        self.assertNotIn("plugin", opencode)
+        self.assertNotIn("command", opencode)
 
     def test_effective_servers_are_lean_and_profile_compatible(self) -> None:
         root = Path(__file__).resolve().parent.parent

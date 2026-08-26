@@ -12,7 +12,7 @@ verbosity, native tools, plugins, and ordinary permissions to each client.
 - Installed native tools, skills, plugins, apps, and connectors activate on demand.
 - Tracked logical configuration separated from ignored machine-local bindings.
 - Dry-run, backup, restore, doctor, deterministic tests, and CI before mutation.
-- No ambient lifecycle hook or OpenCode plugin at session startup.
+- No ambient lifecycle hook; OpenCode loads only the explicitly managed goal plugin.
 - Compact, client-native status lines with a shared information hierarchy.
 - Client-native agents and rules metadata where formats differ.
 
@@ -102,11 +102,70 @@ scripts/toggle-skill disable improve
 Never install `garrytan/gstack` or `obra/superpowers` permanently. Pull either
 on demand and remove it after the task.
 
+## Standardized plugins
+
+`config/plugins.json` records the minimal selected plugin set, MCP ownership, and
+the shared precedence contract: native > plugin > MCP > CLI. A standardized
+capability does not imply installing the same package everywhere. Native support
+wins; an enabled plugin wins over a duplicate standalone MCP only when the
+plugin owns the integration; otherwise the MCP remains the portable fallback.
+
+The selected baseline is deliberately small:
+
+| Client | Selected plugins | Why |
+| --- | --- | --- |
+| Codex | Runtime Browser, Chrome, Computer Use; curated GitHub | Lazy native bundles already supplied by Codex |
+| Claude Code | Official `typescript-lsp` | Uses the installed `typescript-language-server` with no always-on prompt payload |
+| Cursor | Verified `context7-plugin` | Adds `/docs`, a documentation skill, and a focused research subagent in addition to Context7 MCP |
+| OpenCode | Pinned `opencode-goal-plugin@0.8.2` | Fills a native capability gap without repository state |
+
+Cursor's Context7 plugin owns that integration, so generated Cursor MCP config
+does not also preload the standalone Context7 server. Claude's Context7 and
+GitHub marketplace entries are plain MCP wrappers; they are not installed just
+to change packaging. Datadog plugins are recognized as preferred replacements,
+but Datadog remains uninstalled and inactive until an operational task justifies
+authentication. Claude's preview Datadog plugin is especially not baseline
+because it adds session hooks and an always-on prompt contribution.
+
+The cross-client goal contract is:
+
+| Client | Implementation |
+| --- | --- |
+| Codex | Native `/goal`; the stable `goals` feature remains enabled |
+| Claude Code | Native `/goal` with its session-scoped evaluator |
+| Cursor Agent | Native `/goal`; `/loop` remains available for scheduled check-ins |
+| OpenCode | Pinned `opencode-goal-plugin@0.8.2` and a native-looking `/goal` command |
+
+OpenCode normally persists this plugin under `.opencode/goals`. The managed
+configuration sets `persistState: false`, so it keeps active session state in
+memory and never creates goal files in repositories. The package loads at
+OpenCode startup but does not auto-continue unless `/goal` is active. OpenCode
+installs configured npm plugins into its user cache with Bun; no project package
+or repository-local plugin directory is created.
+
+Use the same outcome-oriented prompt in each CLI:
+
+```text
+/goal Complete <objective> until <verifiable stopping condition>.
+```
+
+The mapping follows the official [Codex goal](https://learn.chatgpt.com/use-cases/follow-goals),
+[Claude goal](https://code.claude.com/docs/en/goal),
+[Cursor goal](https://prod.cursor.com/docs/agent/overview), and
+[OpenCode plugin](https://opencode.ai/docs/plugins) contracts. The OpenCode
+implementation is pinned to the reviewed
+[`opencode-goal-plugin`](https://github.com/willytop8/OpenCode-goal-plugin)
+release instead of floating to the latest package at session startup.
+
 ## Capability resolution
 
-`config/capabilities.json` is a diagnostic inventory, not a runtime router. It
-reports native tools, plugins, MCP servers, and CLI fallbacks without activating
-them, starting a server, changing a profile, or promising current-session access.
+`config/capabilities.json` reports native tools, plugins, MCP servers, and CLI
+fallbacks without activating them, starting a server, changing a profile, or
+promising current-session access. Selection is ranked by capability kind instead
+of JSON list order, so an enabled plugin cannot accidentally lose to a duplicate
+MCP merely because the MCP was declared first. Reports show lower-priority active
+implementations as shadowed and warn when a plugin and the MCP it supersedes are
+both active.
 
 Inspect what a client can use now:
 
@@ -148,7 +207,9 @@ approval or authentication policy drifts from the canonical MCP definition.
 ## MCP configuration
 
 `mcp/canonical.json` is the only hand-edited MCP definition. `scripts/render`
-generates global configs for all four clients. Only remote Context7 is global.
+generates global configs for all four clients. Remote Context7 is global for
+Codex, Claude, and OpenCode. Cursor receives it through its selected plugin, so
+its generated standalone MCP baseline is empty.
 Chrome DevTools, Codebase Memory, Serena, Basic Memory, and Datadog remain
 available as opt-in profiles, but none starts in an ordinary session. Serena's
 semantic profile relocates its home and per-project data under the user's cache
@@ -201,9 +262,9 @@ Client implementations intentionally differ:
 
 | Client | Native path |
 | --- | --- |
-| Codex | `codex plugin`, `/plugins`, `--search`, Browser/Chrome/Computer Use plugins, and built-in subagents |
-| Claude Code | Web tools, `--chrome`, `/agents`, `claude plugin`, and classifier-backed `auto` permissions |
-| Cursor Agent | Built-in code/web tools, `cursor-agent plugin`, `--auto-review`, optional sandbox, and explicit `--worktree` |
+| Codex | `codex plugin add`, `/plugins`, `--search`, Browser/Chrome/Computer Use plugins, and built-in subagents |
+| Claude Code | Web tools, `--chrome`, `/agents`, official marketplace plugins, and classifier-backed `auto` permissions |
+| Cursor Agent | Built-in code/web tools, Customize or IDE `/add-plugin`, `--auto-review`, optional sandbox, and explicit `--worktree` |
 | OpenCode | Built-in web/LSP/skills/agents and `opencode plugin <module>`; there is no `/plugin` slash command |
 
 ## Status lines

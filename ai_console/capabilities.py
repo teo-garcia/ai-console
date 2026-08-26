@@ -21,6 +21,12 @@ CAPABILITY_CLIENTS = (
     "opencode",
 )
 CAPABILITY_KINDS = {"native", "plugin", "mcp", "cli"}
+CAPABILITY_KIND_PRIORITY = {
+    "native": 0,
+    "plugin": 1,
+    "mcp": 2,
+    "cli": 3,
+}
 CAPABILITY_RISKS = {"read-only", "interactive", "write", "external-write"}
 CAPABILITY_ACTIVATIONS = {"global", "lazy", "repository", "on-demand"}
 APPROVAL_MODES = {"auto", "writes", "prompt", "approve"}
@@ -143,6 +149,27 @@ def _validate_implementation(
                 f"implementation {implementation_id!r} auth does not match "
                 f"MCP server {server_name!r}"
             )
+    supersedes_mcp = implementation.get("supersedesMcp")
+    if supersedes_mcp is not None:
+        if kind != "plugin" or not isinstance(supersedes_mcp, str):
+            raise ConfigError(
+                f"implementation {implementation_id!r} has invalid MCP supersession"
+            )
+        if supersedes_mcp not in servers:
+            raise ConfigError(
+                f"implementation {implementation_id!r} supersedes unknown MCP server"
+            )
+        replaced = servers[supersedes_mcp]
+        if replaced.get("approvalMode") != implementation["approval"]:
+            raise ConfigError(
+                f"implementation {implementation_id!r} approval does not match "
+                f"superseded MCP server {supersedes_mcp!r}"
+            )
+        if replaced.get("auth") != implementation.get("auth"):
+            raise ConfigError(
+                f"implementation {implementation_id!r} auth does not match "
+                f"superseded MCP server {supersedes_mcp!r}"
+            )
 
 
 def discover_codex_plugins(home: Path | None = None) -> dict[str, dict[str, Any]]:
@@ -259,6 +286,15 @@ def discover_cursor_plugins(home: Path | None = None) -> dict[str, dict[str, Any
         sorted(plugins_root.rglob("plugin.json")) if plugins_root.is_dir() else []
     )
     discovered = _manifest_plugins(manifests, ".cursor-plugin")
+    for name, metadata in _manifest_plugins(manifests, ".claude-plugin").items():
+        for source in metadata["sources"]:
+            _record_plugin(
+                discovered,
+                name,
+                source,
+                version=metadata["versions"][0] if metadata["versions"] else None,
+                enabled=True,
+            )
     for manifest in manifests:
         if manifest.parent.name == ".cursor-plugin":
             continue
@@ -301,10 +337,11 @@ def discover_opencode_plugins(home: Path | None = None) -> dict[str, dict[str, A
     configured_plugins = config.get("plugin")
     if isinstance(configured_plugins, list):
         for value in configured_plugins:
-            if isinstance(value, str):
+            package = value[0] if isinstance(value, list) and value else value
+            if isinstance(package, str):
                 _record_plugin(
                     discovered,
-                    _configured_plugin_name(value),
+                    _configured_plugin_name(package),
                     config_path,
                     enabled=True,
                 )
@@ -395,10 +432,13 @@ def resolve_capabilities(
     if client not in CAPABILITY_CLIENTS:
         raise ConfigError(f"unsupported capability client {client!r}")
     registry = load_capability_registry(root)
+    mcp_client = "codex" if client.startswith("codex-") else client
     base_profiles = _selected_repo_profiles(root, repo_name)
     profiles = _normalize_profiles(root, base_profiles, additional_profiles)
-    active_servers = set(effective_server_names(root, base_profiles))
-    preview_servers = set(effective_server_names(root, profiles))
+    active_servers = set(
+        effective_server_names(root, base_profiles, client=mcp_client)
+    )
+    preview_servers = set(effective_server_names(root, profiles, client=mcp_client))
     canonical = load_json(root / "mcp/canonical.json")
     servers = canonical["servers"]
     plugins = discover_client_plugins(client, home)
@@ -413,8 +453,6 @@ def resolve_capabilities(
 
     for capability_name, capability in registry["capabilities"].items():
         resolved_implementations: list[dict[str, Any]] = []
-        preferred: str | None = None
-        preview_preferred: str | None = None
         for implementation in capability["implementations"]:
             if client not in implementation["clients"]:
                 continue
@@ -427,24 +465,44 @@ def resolve_capabilities(
                 live,
             )
             resolved_implementations.append(resolved)
-            if preferred is None and resolved["state"] in {
-                "available",
-                "enabled",
-                "installed",
-                "configured",
-            }:
-                preferred = resolved["id"]
-            if preview_preferred is None and resolved["state"] in {
+        if not resolved_implementations:
+            continue
+        preferred = _preferred_implementation(
+            resolved_implementations,
+            {"available", "enabled", "installed", "configured"},
+        )
+        preview_preferred = _preferred_implementation(
+            resolved_implementations,
+            {
                 "available",
                 "available-on-demand",
                 "enabled",
                 "installed",
                 "configured",
                 "planned-profile",
-            }:
-                preview_preferred = resolved["id"]
-        if not resolved_implementations:
-            continue
+            },
+        )
+        for implementation in resolved_implementations:
+            if (
+                preferred is not None
+                and implementation["id"] != preferred
+                and implementation["state"]
+                in {"available", "enabled", "installed", "configured"}
+            ):
+                implementation["shadowedBy"] = preferred
+        duplicate_mcp = sorted(
+            {
+                implementation["supersedesMcp"]
+                for implementation in resolved_implementations
+                if implementation.get("supersedesMcp")
+                and implementation["state"] == "enabled"
+                and any(
+                    candidate.get("mcpServer") == implementation["supersedesMcp"]
+                    and candidate["state"] == "configured"
+                    for candidate in resolved_implementations
+                )
+            }
+        )
         resolved_capabilities.append(
             {
                 "name": capability_name,
@@ -453,6 +511,7 @@ def resolve_capabilities(
                 "activation": capability["activation"],
                 "preferred": preferred,
                 "previewPreferred": preview_preferred,
+                "duplicateMcpServers": duplicate_mcp,
                 "implementations": resolved_implementations,
             }
         )
@@ -462,8 +521,12 @@ def resolve_capabilities(
         "profiles": list(base_profiles),
         "previewProfiles": list(profiles),
         "temporaryProfiles": list(additional_profiles),
-        "effectiveMcpServers": list(effective_server_names(root, base_profiles)),
-        "previewMcpServers": list(effective_server_names(root, profiles)),
+        "effectiveMcpServers": list(
+            effective_server_names(root, base_profiles, client=mcp_client)
+        ),
+        "previewMcpServers": list(
+            effective_server_names(root, profiles, client=mcp_client)
+        ),
         "capabilities": resolved_capabilities,
         "discoveredPlugins": {
             name: {
@@ -483,7 +546,19 @@ def resolve_capabilities(
             if name not in registered_plugins
         },
         "liveChecks": live,
+        "preferencePolicy": list(CAPABILITY_KIND_PRIORITY),
     }
+
+
+def _preferred_implementation(
+    implementations: list[dict[str, Any]], states: set[str]
+) -> str | None:
+    candidates = [
+        (CAPABILITY_KIND_PRIORITY[implementation["kind"]], index, implementation["id"])
+        for index, implementation in enumerate(implementations)
+        if implementation["state"] in states
+    ]
+    return min(candidates)[2] if candidates else None
 
 
 def _resolve_implementation(
@@ -565,6 +640,7 @@ def _resolve_implementation(
         "command",
         "pluginName",
         "requires",
+        "supersedesMcp",
     ):
         if key in implementation:
             result[key] = implementation[key]
@@ -581,6 +657,7 @@ def format_capability_report(payload: dict[str, Any]) -> str:
         f"repo: {payload['repo'] or '-'}",
         f"repository MCP overrides: {profiles}",
         f"effective MCP: {','.join(payload['effectiveMcpServers'])}",
+        f"preference: {' > '.join(payload['preferencePolicy'])}",
     ]
     if preview_profiles != profiles:
         lines.append(f"compatibility preview overrides: {preview_profiles}")
@@ -594,6 +671,11 @@ def format_capability_report(payload: dict[str, Any]) -> str:
         if capability["previewPreferred"] != capability["preferred"]:
             summary += f"; preview={capability['previewPreferred'] or 'unavailable'}"
         lines.append(summary)
+        if capability["duplicateMcpServers"]:
+            lines.append(
+                "  duplicate MCP (disable standalone): "
+                + ",".join(capability["duplicateMcpServers"])
+            )
         for implementation in capability["implementations"]:
             enabled = str(implementation["enabled"]).lower()
             detail = (
@@ -608,6 +690,8 @@ def format_capability_report(payload: dict[str, Any]) -> str:
                 detail += f"; profile={implementation['profile']}"
             if implementation.get("requires"):
                 detail += f"; requires={implementation['requires']}"
+            if implementation.get("shadowedBy"):
+                detail += f"; shadowed-by={implementation['shadowedBy']}"
             lines.append(detail)
     if payload["unmappedPlugins"]:
         lines.append(
