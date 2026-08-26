@@ -108,7 +108,15 @@ class CapabilityResolutionTests(unittest.TestCase):
                     )
                     self.assertIn("documents", payload["unmappedPlugins"])
 
-    def test_cli_compatibility_profile_preview_does_not_change_ambient_mcp(self) -> None:
+    @patch("ai_console.capabilities.shutil.which")
+    def test_cli_compatibility_profile_preview_does_not_change_ambient_mcp(
+        self, which: MagicMock
+    ) -> None:
+        available_commands = {"/bin/sh", "npx", "rg"}
+        which.side_effect = lambda command: (
+            command if command.startswith("/") else f"/usr/bin/{command}"
+        ) if command in available_commands else None
+
         with tempfile.TemporaryDirectory() as temporary:
             home = Path(temporary)
 
