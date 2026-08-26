@@ -102,6 +102,10 @@ def _validate_implementation(
         raise ConfigError(f"implementation {implementation_id!r} has invalid approval")
     if not isinstance(implementation.get("useWhen"), str):
         raise ConfigError(f"implementation {implementation_id!r} requires useWhen")
+    if "requires" in implementation and not isinstance(
+        implementation.get("requires"), str
+    ):
+        raise ConfigError(f"implementation {implementation_id!r} has invalid requires")
 
     required_key = {
         "plugin": "pluginName",
@@ -156,11 +160,11 @@ def discover_codex_plugins(home: Path | None = None) -> dict[str, dict[str, Any]
         version = payload.get("version")
         if not isinstance(name, str) or not isinstance(version, str):
             continue
-        current = discovered.setdefault(name, {"versions": [], "manifests": []})
+        current = discovered.setdefault(name, {"versions": [], "sources": []})
         if version not in current["versions"]:
             current["versions"].append(version)
             current["versions"].sort()
-        current["manifests"].append(str(manifest))
+        current["sources"].append(str(manifest))
     config_path = active_home / ".codex/config.toml"
     try:
         config = tomllib.loads(config_path.read_text(encoding="utf-8"))
@@ -175,6 +179,149 @@ def discover_codex_plugins(home: Path | None = None) -> dict[str, dict[str, Any]
             if name in discovered and isinstance(value.get("enabled"), bool):
                 discovered[name]["enabled"] = value["enabled"]
     return discovered
+
+
+def _record_plugin(
+    discovered: dict[str, dict[str, Any]],
+    name: str,
+    source: Path | str,
+    *,
+    version: str | None = None,
+    enabled: bool | None = None,
+) -> None:
+    current = discovered.setdefault(name, {"versions": [], "sources": []})
+    source_value = str(source)
+    if source_value not in current["sources"]:
+        current["sources"].append(source_value)
+    if version and version not in current["versions"]:
+        current["versions"].append(version)
+        current["versions"].sort()
+    if enabled is not None:
+        current["enabled"] = enabled
+
+
+def _manifest_plugins(
+    manifests: list[Path], manifest_dir: str
+) -> dict[str, dict[str, Any]]:
+    discovered: dict[str, dict[str, Any]] = {}
+    for manifest in manifests:
+        if manifest.parent.name != manifest_dir:
+            continue
+        try:
+            payload = json.loads(manifest.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        name = payload.get("name")
+        version = payload.get("version")
+        if not isinstance(name, str):
+            continue
+        _record_plugin(
+            discovered,
+            name,
+            manifest,
+            version=version if isinstance(version, str) else None,
+        )
+    return discovered
+
+
+def _configured_plugin_name(value: str) -> str:
+    if value.startswith("@") and value.count("@") > 1:
+        return value.rsplit("@", 1)[0]
+    return value.split("@", 1)[0]
+
+
+def discover_claude_plugins(home: Path | None = None) -> dict[str, dict[str, Any]]:
+    active_home = home or Path.home()
+    plugins_root = active_home / ".claude/plugins"
+    manifests = (
+        sorted(plugins_root.rglob("plugin.json")) if plugins_root.is_dir() else []
+    )
+    discovered = _manifest_plugins(manifests, ".claude-plugin")
+    settings_path = active_home / ".claude/settings.json"
+    try:
+        settings = json.loads(settings_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        settings = {}
+    enabled_plugins = settings.get("enabledPlugins")
+    if isinstance(enabled_plugins, dict):
+        for qualified_name, enabled in enabled_plugins.items():
+            if not isinstance(qualified_name, str) or not isinstance(enabled, bool):
+                continue
+            name = _configured_plugin_name(qualified_name)
+            _record_plugin(discovered, name, settings_path, enabled=enabled)
+    return discovered
+
+
+def discover_cursor_plugins(home: Path | None = None) -> dict[str, dict[str, Any]]:
+    active_home = home or Path.home()
+    plugins_root = active_home / ".cursor/plugins"
+    manifests = (
+        sorted(plugins_root.rglob("plugin.json")) if plugins_root.is_dir() else []
+    )
+    discovered = _manifest_plugins(manifests, ".cursor-plugin")
+    for manifest in manifests:
+        if manifest.parent.name == ".cursor-plugin":
+            continue
+        try:
+            relative = manifest.relative_to(plugins_root)
+        except ValueError:
+            continue
+        if len(relative.parts) not in {2, 3}:
+            continue
+        try:
+            payload = json.loads(manifest.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        name = payload.get("name")
+        version = payload.get("version")
+        if isinstance(name, str):
+            _record_plugin(
+                discovered,
+                name,
+                manifest,
+                version=version if isinstance(version, str) else None,
+            )
+    return discovered
+
+
+def discover_opencode_plugins(home: Path | None = None) -> dict[str, dict[str, Any]]:
+    active_home = home or Path.home()
+    config_root = active_home / ".config/opencode"
+    discovered: dict[str, dict[str, Any]] = {}
+    plugins_root = config_root / "plugins"
+    if plugins_root.is_dir():
+        for plugin in sorted(plugins_root.iterdir()):
+            if plugin.is_file() and plugin.suffix in {".js", ".ts", ".mjs", ".cjs"}:
+                _record_plugin(discovered, plugin.stem, plugin, enabled=True)
+    config_path = config_root / "opencode.jsonc"
+    try:
+        config = json.loads(config_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        config = {}
+    configured_plugins = config.get("plugin")
+    if isinstance(configured_plugins, list):
+        for value in configured_plugins:
+            if isinstance(value, str):
+                _record_plugin(
+                    discovered,
+                    _configured_plugin_name(value),
+                    config_path,
+                    enabled=True,
+                )
+    return discovered
+
+
+def discover_client_plugins(
+    client: str, home: Path | None = None
+) -> dict[str, dict[str, Any]]:
+    if client.startswith("codex-"):
+        return discover_codex_plugins(home)
+    discoverer = {
+        "claude": discover_claude_plugins,
+        "cursor": discover_cursor_plugins,
+        "opencode": discover_opencode_plugins,
+    }[client]
+    return discoverer(home)
 
 
 def _normalize_profiles(
@@ -254,12 +401,13 @@ def resolve_capabilities(
     preview_servers = set(effective_server_names(root, profiles))
     canonical = load_json(root / "mcp/canonical.json")
     servers = canonical["servers"]
-    plugins = discover_codex_plugins(home)
+    plugins = discover_client_plugins(client, home)
     registered_plugins = {
         implementation["pluginName"]
         for capability in registry["capabilities"].values()
         for implementation in capability["implementations"]
         if implementation["kind"] == "plugin"
+        and client in implementation["clients"]
     }
     resolved_capabilities: list[dict[str, Any]] = []
 
@@ -288,6 +436,7 @@ def resolve_capabilities(
                 preferred = resolved["id"]
             if preview_preferred is None and resolved["state"] in {
                 "available",
+                "available-on-demand",
                 "enabled",
                 "installed",
                 "configured",
@@ -316,17 +465,19 @@ def resolve_capabilities(
         "effectiveMcpServers": list(effective_server_names(root, base_profiles)),
         "previewMcpServers": list(effective_server_names(root, profiles)),
         "capabilities": resolved_capabilities,
-        "discoveredCodexPlugins": {
+        "discoveredPlugins": {
             name: {
                 "versions": value["versions"],
                 "enabled": value.get("enabled", "unknown"),
+                "sources": value["sources"],
             }
             for name, value in sorted(plugins.items())
         },
-        "unmappedCodexPlugins": {
+        "unmappedPlugins": {
             name: {
                 "versions": value["versions"],
                 "enabled": value.get("enabled", "unknown"),
+                "sources": value["sources"],
             }
             for name, value in sorted(plugins.items())
             if name not in registered_plugins
@@ -349,9 +500,9 @@ def _resolve_implementation(
     session = "not-applicable"
     version: str | None = None
     if kind == "native":
-        state = "available"
+        state = "available-on-demand" if implementation.get("requires") else "available"
         session = "unknown"
-        enabled: bool | str = "unknown"
+        enabled: bool | str = False if implementation.get("requires") else "unknown"
     elif kind == "plugin":
         plugin = plugins.get(implementation["pluginName"])
         if plugin and plugin.get("enabled") is True:
@@ -407,7 +558,14 @@ def _resolve_implementation(
         "reachable": reachable,
         "useWhen": implementation["useWhen"],
     }
-    for key in ("selector", "profile", "mcpServer", "command", "pluginName"):
+    for key in (
+        "selector",
+        "profile",
+        "mcpServer",
+        "command",
+        "pluginName",
+        "requires",
+    ):
         if key in implementation:
             result[key] = implementation[key]
     if version is not None:
@@ -448,10 +606,12 @@ def format_capability_report(payload: dict[str, Any]) -> str:
                 detail += f"; selector={implementation['selector']}"
             if implementation.get("profile"):
                 detail += f"; profile={implementation['profile']}"
+            if implementation.get("requires"):
+                detail += f"; requires={implementation['requires']}"
             lines.append(detail)
-    if payload["unmappedCodexPlugins"]:
+    if payload["unmappedPlugins"]:
         lines.append(
-            "other discovered Codex plugins: "
-            + ",".join(payload["unmappedCodexPlugins"])
+            f"other discovered {payload['client']} plugins: "
+            + ",".join(payload["unmappedPlugins"])
         )
     return "\n".join(lines)

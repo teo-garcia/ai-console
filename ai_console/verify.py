@@ -395,11 +395,15 @@ def doctor(
                     f"capability {capability['name']}: preferred={preferred}; {states}"
                 )
             elif any(
-                item["state"] in {"available-profile", "planned-profile"}
+                item["state"] in {
+                    "available-on-demand",
+                    "available-profile",
+                    "planned-profile",
+                }
                 for item in capability["implementations"]
             ):
                 result.ok(
-                    f"capability {capability['name']}: inactive repository profile; "
+                    f"capability {capability['name']}: inactive optional capability; "
                     f"{states}"
                 )
             else:

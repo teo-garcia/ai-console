@@ -44,6 +44,27 @@
           "useWhen": "Public facts, current information, citations, or direct page retrieval"
         },
         {
+          "id": "claude-web",
+          "kind": "native",
+          "clients": ["claude"],
+          "approval": "auto",
+          "useWhen": "Claude needs current public sources through its built-in web search or fetch tools"
+        },
+        {
+          "id": "cursor-web",
+          "kind": "native",
+          "clients": ["cursor"],
+          "approval": "auto",
+          "useWhen": "Cursor needs current public information through its native web tools"
+        },
+        {
+          "id": "opencode-web",
+          "kind": "native",
+          "clients": ["opencode"],
+          "approval": "auto",
+          "useWhen": "OpenCode can answer through its built-in webfetch or configured websearch tool"
+        },
+        {
           "id": "browser-plugin",
           "kind": "plugin",
           "clients": ["codex-desktop", "codex-cli"],
@@ -100,6 +121,15 @@
           "auth": "user-session",
           "approval": "prompt",
           "useWhen": "The task depends on existing tabs, cookies, extensions, or logged-in state"
+        },
+        {
+          "id": "claude-in-chrome",
+          "kind": "native",
+          "clients": ["claude"],
+          "auth": "user-session",
+          "approval": "prompt",
+          "requires": "Claude in Chrome connection",
+          "useWhen": "Claude needs the user's signed-in Chrome state rather than public web retrieval"
         }
       ]
     },
@@ -108,6 +138,20 @@
       "risk": "write",
       "activation": "on-demand",
       "implementations": [
+        {
+          "id": "cursor-code-intelligence",
+          "kind": "native",
+          "clients": ["cursor"],
+          "approval": "auto",
+          "useWhen": "Semantic navigation and editor code intelligence can answer more precisely than text search"
+        },
+        {
+          "id": "claude-code-search",
+          "kind": "native",
+          "clients": ["claude"],
+          "approval": "auto",
+          "useWhen": "Claude's built-in file, glob, and search tools can trace the code without another service"
+        },
         {
           "id": "ripgrep",
           "kind": "cli",
@@ -138,6 +182,158 @@
           "profile": "semantic",
           "approval": "writes",
           "useWhen": "Symbol-aware navigation or refactoring is materially safer than text search"
+        }
+      ]
+    },
+    "semantic-code-intelligence": {
+      "description": "Navigate definitions, references, diagnostics, and symbols semantically",
+      "risk": "read-only",
+      "activation": "lazy",
+      "implementations": [
+        {
+          "id": "cursor-code-intelligence",
+          "kind": "native",
+          "clients": ["cursor"],
+          "approval": "auto",
+          "useWhen": "Cursor can use its editor-backed semantic understanding and language tooling"
+        },
+        {
+          "id": "claude-lsp-host",
+          "kind": "native",
+          "clients": ["claude"],
+          "approval": "auto",
+          "requires": "language-specific Claude LSP plugin",
+          "useWhen": "Definitions, references, hover data, or diagnostics need a configured language server"
+        },
+        {
+          "id": "opencode-lsp",
+          "kind": "native",
+          "clients": ["opencode"],
+          "approval": "auto",
+          "requires": "experimental OpenCode LSP tool enabled",
+          "useWhen": "Experimental LSP support is worth enabling for a symbol-aware task"
+        }
+      ]
+    },
+    "procedural-guidance": {
+      "description": "Load reusable task instructions only when the work matches them",
+      "risk": "read-only",
+      "activation": "lazy",
+      "implementations": [
+        {
+          "id": "native-skills",
+          "kind": "native",
+          "clients": [
+            "codex-desktop",
+            "codex-cli",
+            "codex-ide",
+            "claude",
+            "cursor",
+            "opencode"
+          ],
+          "approval": "auto",
+          "useWhen": "A task matches an installed skill or the user explicitly invokes one"
+        }
+      ]
+    },
+    "delegated-work": {
+      "description": "Delegate bounded independent work into isolated agent context",
+      "risk": "write",
+      "activation": "lazy",
+      "implementations": [
+        {
+          "id": "codex-subagents",
+          "kind": "native",
+          "clients": ["codex-desktop", "codex-cli", "codex-ide"],
+          "approval": "writes",
+          "useWhen": "Independent repository investigation or implementation can proceed concurrently"
+        },
+        {
+          "id": "claude-subagents",
+          "kind": "native",
+          "clients": ["claude"],
+          "approval": "writes",
+          "useWhen": "A bounded task benefits from a Claude subagent or explicitly coordinated agent team"
+        },
+        {
+          "id": "cursor-subagents",
+          "kind": "native",
+          "clients": ["cursor"],
+          "approval": "writes",
+          "useWhen": "A bounded task benefits from isolated context; worktree isolation remains opt-in"
+        },
+        {
+          "id": "opencode-subagents",
+          "kind": "native",
+          "clients": ["opencode"],
+          "approval": "writes",
+          "useWhen": "A task can be delegated to an OpenCode subagent with its own model, tools, and permissions"
+        }
+      ]
+    },
+    "code-review": {
+      "description": "Review changes for correctness, regressions, and security issues",
+      "risk": "read-only",
+      "activation": "lazy",
+      "implementations": [
+        {
+          "id": "cursor-review",
+          "kind": "native",
+          "clients": ["cursor"],
+          "selector": "/review",
+          "approval": "auto",
+          "useWhen": "Cursor's built-in review skill can inspect a working tree or proposed change"
+        },
+        {
+          "id": "reviewer-agent",
+          "kind": "native",
+          "clients": [
+            "codex-desktop",
+            "codex-cli",
+            "codex-ide",
+            "claude",
+            "cursor",
+            "opencode"
+          ],
+          "approval": "auto",
+          "useWhen": "The configured reviewer agent should inspect a diff in isolated context"
+        }
+      ]
+    },
+    "custom-tooling": {
+      "description": "Package reusable client-specific tools without making them ambient MCP services",
+      "risk": "write",
+      "activation": "on-demand",
+      "implementations": [
+        {
+          "id": "codex-plugins",
+          "kind": "native",
+          "clients": ["codex-desktop", "codex-cli"],
+          "selector": "/plugins",
+          "approval": "writes",
+          "useWhen": "Skills, connectors, hooks, browser extensions, or task templates belong in one Codex bundle"
+        },
+        {
+          "id": "claude-plugins",
+          "kind": "native",
+          "clients": ["claude"],
+          "selector": "/plugin",
+          "approval": "writes",
+          "useWhen": "Skills, agents, hooks, MCP, LSP, commands, or monitors belong in one Claude bundle"
+        },
+        {
+          "id": "cursor-plugins",
+          "kind": "native",
+          "clients": ["cursor"],
+          "approval": "writes",
+          "useWhen": "Rules, skills, agents, commands, MCP, or hooks belong in a Cursor or Agent Plugin"
+        },
+        {
+          "id": "opencode-plugins",
+          "kind": "native",
+          "clients": ["opencode"],
+          "approval": "writes",
+          "useWhen": "An in-process event plugin or first-class custom tool is simpler than an MCP server"
         }
       ]
     },

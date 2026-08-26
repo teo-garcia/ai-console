@@ -6,7 +6,10 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from ai_console.capabilities import (
+    discover_claude_plugins,
     discover_codex_plugins,
+    discover_cursor_plugins,
+    discover_opencode_plugins,
     format_capability_report,
     load_capability_registry,
     resolve_capabilities,
@@ -92,14 +95,14 @@ class CapabilityResolutionTests(unittest.TestCase):
                         "computer-use-plugin",
                     )
                     self.assertEqual(
-                        payload["discoveredCodexPlugins"]["browser"]["versions"],
+                        payload["discoveredPlugins"]["browser"]["versions"],
                         ["2.0.0"],
                     )
                     self.assertIs(
-                        payload["discoveredCodexPlugins"]["browser"]["enabled"],
+                        payload["discoveredPlugins"]["browser"]["enabled"],
                         True,
                     )
-                    self.assertIn("documents", payload["unmappedCodexPlugins"])
+                    self.assertIn("documents", payload["unmappedPlugins"])
 
     def test_cli_compatibility_profile_preview_does_not_change_ambient_mcp(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -172,6 +175,70 @@ class CapabilityResolutionTests(unittest.TestCase):
             invalid.write_text("not json", encoding="utf-8")
 
             self.assertEqual(discover_codex_plugins(home), {})
+
+    def test_plugin_discovery_uses_each_clients_native_storage(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            home = Path(temporary)
+            write_json(
+                home
+                / ".claude/plugins/cache/test/linter/.claude-plugin/plugin.json",
+                {"name": "linter", "version": "1.2.0"},
+            )
+            write_json(
+                home / ".claude/settings.json",
+                {"enabledPlugins": {"linter@official": True}},
+            )
+            write_json(
+                home / ".cursor/plugins/local/review/.cursor-plugin/plugin.json",
+                {"name": "review", "version": "2.0.0"},
+            )
+            opencode_plugin = (
+                home / ".config/opencode/plugins/herdr-agent-state.js"
+            )
+            opencode_plugin.parent.mkdir(parents=True)
+            opencode_plugin.write_text("export default {}\n", encoding="utf-8")
+            write_json(
+                home / ".config/opencode/opencode.jsonc",
+                {"plugin": ["@scope/tools@3.0.0"]},
+            )
+
+            self.assertIs(discover_claude_plugins(home)["linter"]["enabled"], True)
+            self.assertEqual(
+                discover_cursor_plugins(home)["review"]["versions"], ["2.0.0"]
+            )
+            opencode = discover_opencode_plugins(home)
+            self.assertIs(opencode["herdr-agent-state"]["enabled"], True)
+            self.assertIn("@scope/tools", opencode)
+
+    def test_native_capability_matrix_exposes_each_clients_strengths(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            home = Path(temporary)
+            expected = {
+                "claude": ("public-research", "claude-web"),
+                "cursor": ("semantic-code-intelligence", "cursor-code-intelligence"),
+                "opencode": ("custom-tooling", "opencode-plugins"),
+            }
+            for client, (capability_name, implementation_id) in expected.items():
+                with self.subTest(client=client):
+                    payload = resolve_capabilities(client=client, home=home)
+                    capabilities = {
+                        item["name"]: item for item in payload["capabilities"]
+                    }
+                    self.assertEqual(
+                        capabilities[capability_name]["preferred"], implementation_id
+                    )
+
+            claude = resolve_capabilities(client="claude", home=home)
+            semantic = next(
+                item
+                for item in claude["capabilities"]
+                if item["name"] == "semantic-code-intelligence"
+            )
+            self.assertIsNone(semantic["preferred"])
+            self.assertEqual(semantic["previewPreferred"], "claude-lsp-host")
+            self.assertEqual(
+                semantic["implementations"][0]["state"], "available-on-demand"
+            )
 
     def test_human_report_exposes_fallback_state(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

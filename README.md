@@ -124,6 +124,22 @@ checks; normal doctor and CI remain network-free.
 The resolver reports configuration separately from authentication, reachability,
 and current-session activation. It never installs or invokes a tool.
 
+The inventory is outcome-oriented and preserves each client's native path:
+Claude web and optional LSP plugins, Cursor code intelligence and built-in review,
+OpenCode web/custom tools and in-process plugins, and Codex plugin bundles and
+connectors. Skills and subagents are represented as lazy native capabilities;
+worktree isolation remains task-specific rather than a global default.
+
+Plugin discovery is local and client-specific. Codex manifests, Claude plugin
+settings/manifests, Cursor Plugin and Agent Plugin manifests, and OpenCode file or
+package plugins are reported under the same `discoveredPlugins` field. Discovery
+does not load plugin code, contact a marketplace, or enable anything.
+The client-specific claims track the current official documentation for
+[Codex plugins](https://learn.chatgpt.com/docs/plugins),
+[Claude extensions](https://code.claude.com/docs/en/features-overview),
+[Cursor customization](https://prod.cursor.com/docs/customize-cursor), and
+[OpenCode tools](https://opencode.ai/docs/tools).
+
 Codex MCP output also renders least-surprising approval defaults from the same
 policy: Context7 uses `auto`, browser/code-navigation/index/memory servers use
 `writes`, and Datadog uses `prompt`. Capability validation fails if its declared
