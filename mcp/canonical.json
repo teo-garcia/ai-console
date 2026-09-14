@@ -4,7 +4,8 @@
     "datadog",
     "chrome-devtools",
     "atlassian",
-    "circleci"
+    "circleci",
+    "github"
   ],
   "retiredServers": [
     "filesystem",
@@ -13,8 +14,7 @@
     "_serena",
     "serena",
     "codebase-memory",
-    "basic-memory",
-    "github"
+    "basic-memory"
   ],
   "global": {
     "servers": [
@@ -22,7 +22,8 @@
       "chrome-devtools",
       "datadog",
       "atlassian",
-      "circleci"
+      "circleci",
+      "github"
     ]
   },
   "profiles": {},
@@ -55,6 +56,14 @@
       "url": "https://mcp.circleci.com/v1/mcp",
       "auth": "oauth",
       "approvalMode": "prompt"
+    },
+    "github": {
+      "transport": "remote",
+      "url": "https://api.githubcopilot.com/mcp/",
+      "auth": "pat-env",
+      "bearerTokenEnvVar": "GITHUB_PAT_TOKEN",
+      "clients": ["codex"],
+      "approvalMode": "writes"
     }
   }
 }

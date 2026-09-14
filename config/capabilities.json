@@ -521,6 +521,16 @@
           "useWhen": "Private GitHub context or connector-backed PR, issue, and Actions workflows are needed"
         },
         {
+          "id": "github-mcp",
+          "kind": "mcp",
+          "clients": ["codex-desktop", "codex-cli", "codex-ide"],
+          "mcpServer": "github",
+          "auth": "pat-env",
+          "approval": "writes",
+          "requires": "A least-privilege GitHub PAT in GITHUB_PAT_TOKEN",
+          "useWhen": "Codex needs GitHub MCP tools and the connector plugin is unavailable"
+        },
+        {
           "id": "gh-cli",
           "kind": "cli",
           "clients": [

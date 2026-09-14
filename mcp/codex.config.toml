@@ -23,3 +23,8 @@ default_tools_approval_mode = "prompt"
 url = "https://mcp.circleci.com/v1/mcp"
 auth = "oauth"
 default_tools_approval_mode = "prompt"
+
+[mcp_servers.github]
+url = "https://api.githubcopilot.com/mcp/"
+bearer_token_env_var = "GITHUB_PAT_TOKEN"
+default_tools_approval_mode = "writes"

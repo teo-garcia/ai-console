@@ -381,7 +381,7 @@ class CapabilityResolutionTests(unittest.TestCase):
         self.assertEqual(
             docs["implementations"][0]["reachable"], "reachable"
         )
-        self.assertEqual(create_connection.call_count, 4)
+        self.assertEqual(create_connection.call_count, 5)
 
 
 if __name__ == "__main__":

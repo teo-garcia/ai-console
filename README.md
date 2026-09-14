@@ -212,35 +212,38 @@ The client-specific claims track the current official documentation for
 
 Codex MCP output also renders least-surprising approval defaults from the same
 policy: Context7 uses `auto`, Chrome DevTools and GitHub use `writes`, and remote
-service integrations use `prompt`. Capability validation fails if its declared
-approval or authentication policy drifts from the canonical MCP definition.
+service integrations use `prompt`. GitHub authentication reads a least-privilege
+PAT from `GITHUB_PAT_TOKEN`; generated configuration stores only the variable
+name. Capability validation fails if its declared approval or authentication
+policy drifts from the canonical MCP definition.
 
 ## MCP configuration
 
 `mcp/canonical.json` is the only hand-edited MCP definition. `scripts/render`
 generates a global baseline for all four clients: Context7, Chrome DevTools,
-Datadog, Atlassian, and CircleCI. The tracked outputs deliberately retain all
-five portable fallbacks. `scripts/apply-global` then discovers enabled plugins on
+Datadog, Atlassian, and CircleCI. Codex also receives GitHub's hosted MCP as a
+PAT-backed fallback. The tracked outputs deliberately retain the portable
+fallbacks. `scripts/apply-global` then discovers enabled plugins on
 the current computer and suppresses only the MCPs those plugins are proven to
 own. On this computer, Claude receives only CircleCI, Cursor receives every MCP
-except Context7, and OpenCode receives all five. Codex retains all five because
+except Context7, and OpenCode receives all five. Codex retains all six because
 its shared config also serves the plugin-less IDE; Desktop and CLI still prefer
 their native or installed plugins.
 Rendered files contain no fixed home-directory paths or credentials. OAuth and
 service approval stay client-local.
 
 On another computer, clone the repository and run `scripts/apply-global`: every
-fallback is immediately available even if no marketplace plugin has been
-installed. Install any optional client plugin later and rerun the same command;
+credential-free fallback is immediately available even if no marketplace plugin
+has been installed. Install any optional client plugin later and rerun the same command;
 only its now-redundant MCP is removed. No capability profile or repository-local
 state is required.
 
-GitHub is immediately available through Codex's installed GitHub plugin and the
-authenticated `gh` CLI in every client. The hosted GitHub MCP is not baseline:
-live client checks showed that its endpoint requires a PAT header or a host-owned
-OAuth app, so generic MCP OAuth fails in Claude, Cursor, and OpenCode. AI-console
-does not copy a GitHub token into generated configuration merely to force MCP
-packaging.
+GitHub is available through Codex's installed GitHub plugin and an authenticated
+`gh` CLI in every client. Codex also gets the hosted GitHub MCP, configured with
+`bearer_token_env_var = "GITHUB_PAT_TOKEN"`. Claude, Cursor, and OpenCode retain
+their native and CLI paths because a credential-free, portable remote-header
+configuration is not shared across those hosts. AI-console never copies the PAT
+value into generated configuration.
 
 MCP is only one capability layer. Native client tools, installed skills,
 plugins, apps, and connectors remain available on demand even when their tool

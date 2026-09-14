@@ -53,6 +53,17 @@ def server_for_client(server: dict[str, Any], client: str) -> dict[str, Any]:
     return rendered
 
 
+def server_supports_client(server: dict[str, Any], client: str) -> bool:
+    clients = server.get("clients")
+    if clients is None:
+        return True
+    if not isinstance(clients, list) or not all(
+        isinstance(candidate, str) and candidate in CLIENTS for candidate in clients
+    ):
+        raise ConfigError("MCP server clients must contain supported client names")
+    return client in clients
+
+
 def _json_server(server: dict[str, Any]) -> dict[str, Any]:
     if server["transport"] == "remote":
         return {"type": "http", "url": server["url"]}
@@ -82,7 +93,12 @@ def _toml_server(name: str, server: dict[str, Any]) -> str:
     lines = [f"[mcp_servers.{name}]"]
     if server["transport"] == "remote":
         lines.append(f"url = {json.dumps(server['url'])}")
-        if server.get("auth"):
+        if server.get("bearerTokenEnvVar"):
+            lines.append(
+                "bearer_token_env_var = "
+                f"{json.dumps(server['bearerTokenEnvVar'])}"
+            )
+        if server.get("auth") == "oauth":
             lines.append(f"auth = {json.dumps(server['auth'])}")
     else:
         if server.get("startupTimeoutSec") is not None:
@@ -184,6 +200,17 @@ def effective_server_names(
         if name not in selected:
             selected.append(name)
     if client is not None:
+        raw_servers = canonical.get("servers")
+        if not isinstance(raw_servers, dict):
+            raise ConfigError("canonical MCP servers must be an object")
+        supported: list[str] = []
+        for name in selected:
+            raw_server = raw_servers.get(name)
+            if not isinstance(raw_server, dict):
+                raise ConfigError(f"unknown MCP server {name!r}")
+            if server_supports_client(raw_server, client):
+                supported.append(name)
+        selected = supported
         owned = plugin_owned_mcp_servers(
             client, root, enabled_plugins=enabled_plugins
         )
@@ -241,6 +268,7 @@ def render_profile_config(
         [
             name
             for name in profile_server_names(canonical, profile_names)
+            if server_supports_client(canonical["servers"][name], client)
             if name not in plugin_owned_mcp_servers(client, root)
         ],
         client,
@@ -276,7 +304,11 @@ def expected_outputs(root: Path = ROOT) -> dict[Path, str]:
             path = root / "mcp/profiles" / profile_name / filename
             outputs[path] = render_client(
                 canonical,
-                list(profile["servers"]),
+                [
+                    name
+                    for name in profile["servers"]
+                    if server_supports_client(canonical["servers"][name], client)
+                ],
                 client,
                 f"{profile_name} MCP profile",
             )

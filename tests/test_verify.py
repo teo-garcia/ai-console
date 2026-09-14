@@ -61,7 +61,7 @@ class TemplateVerificationTests(unittest.TestCase):
                 any(
                     check.status == "ok"
                     and "overrides=ops,work" in check.message
-                    and "effective servers=context7,chrome-devtools,datadog,atlassian,circleci"
+                    and "effective servers=context7,chrome-devtools,datadog,atlassian,circleci,github"
                     in check.message
                     for check in result.checks
                 ),
