@@ -1,7 +1,0 @@
-## Managed by ai-console: browser MCP profile
-
-[mcp_servers.chrome-devtools]
-command = "npx"
-env = { CHROME_DEBUG_PORT = "9222" }
-args = ["-y", "chrome-devtools-mcp@1.2.0", "--slim"]
-default_tools_approval_mode = "writes"

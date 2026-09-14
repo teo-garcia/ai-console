@@ -3,6 +3,26 @@
     "context7": {
       "type": "http",
       "url": "https://mcp.context7.com/mcp"
+    },
+    "chrome-devtools": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "chrome-devtools-mcp@1.2.0",
+        "--slim"
+      ]
+    },
+    "datadog": {
+      "type": "http",
+      "url": "https://mcp.us5.datadoghq.com/api/unstable/mcp-server/mcp"
+    },
+    "atlassian": {
+      "type": "http",
+      "url": "https://mcp.atlassian.com/v2/mcp"
+    },
+    "circleci": {
+      "type": "http",
+      "url": "https://mcp.circleci.com/v1/mcp"
     }
   }
 }

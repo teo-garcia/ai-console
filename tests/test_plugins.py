@@ -17,12 +17,37 @@ class PluginRegistryTests(unittest.TestCase):
             ["native", "plugin", "mcp", "cli"],
         )
         self.assertEqual(
-            registry["mcpOwnership"]["cursor"],
-            {"context7": "context7-plugin"},
+            registry["mcpOwnership"]["claude"],
+            {
+                "context7": "context7",
+                "chrome-devtools": "chrome-devtools-mcp",
+                "datadog": "datadog",
+                "atlassian": "atlassian",
+            },
         )
         self.assertEqual(
             [item["name"] for item in registry["selected"]["claude"]],
-            ["typescript-lsp"],
+            [
+                "typescript-lsp",
+                "context7",
+                "chrome-devtools-mcp",
+                "datadog",
+                "atlassian",
+            ],
+        )
+        self.assertEqual(
+            registry["mcpOwnership"]["cursor"],
+            {
+                "context7": "context7-plugin",
+                "chrome-devtools": "devtools-for-agents",
+                "datadog": "datadog",
+                "atlassian": "atlassian",
+                "circleci": "circleci",
+            },
+        )
+        self.assertIn(
+            "herdr-agent-state",
+            [item["name"] for item in registry["selected"]["opencode"]],
         )
         goal = registry["capabilities"]["goal"]
 

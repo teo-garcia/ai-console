@@ -1,5 +1,25 @@
-## Managed by ai-console: lean global MCP baseline
+## Managed by ai-console: portable global MCP fallback baseline
 
 [mcp_servers.context7]
 url = "https://mcp.context7.com/mcp"
 default_tools_approval_mode = "auto"
+
+[mcp_servers.chrome-devtools]
+command = "npx"
+args = ["-y", "chrome-devtools-mcp@1.2.0", "--slim"]
+default_tools_approval_mode = "writes"
+
+[mcp_servers.datadog]
+url = "https://mcp.us5.datadoghq.com/api/unstable/mcp-server/mcp"
+auth = "oauth"
+default_tools_approval_mode = "prompt"
+
+[mcp_servers.atlassian]
+url = "https://mcp.atlassian.com/v2/mcp"
+auth = "oauth"
+default_tools_approval_mode = "prompt"
+
+[mcp_servers.circleci]
+url = "https://mcp.circleci.com/v1/mcp"
+auth = "oauth"
+default_tools_approval_mode = "prompt"

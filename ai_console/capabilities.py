@@ -260,8 +260,11 @@ def _configured_plugin_name(value: str) -> str:
 def discover_claude_plugins(home: Path | None = None) -> dict[str, dict[str, Any]]:
     active_home = home or Path.home()
     plugins_root = active_home / ".claude/plugins"
+    installed_cache = plugins_root / "cache"
     manifests = (
-        sorted(plugins_root.rglob("plugin.json")) if plugins_root.is_dir() else []
+        sorted(installed_cache.rglob("plugin.json"))
+        if installed_cache.is_dir()
+        else []
     )
     discovered = _manifest_plugins(manifests, ".claude-plugin")
     settings_path = active_home / ".claude/settings.json"
@@ -282,10 +285,17 @@ def discover_claude_plugins(home: Path | None = None) -> dict[str, dict[str, Any
 def discover_cursor_plugins(home: Path | None = None) -> dict[str, dict[str, Any]]:
     active_home = home or Path.home()
     plugins_root = active_home / ".cursor/plugins"
+    installed_cache = plugins_root / "cache"
     manifests = (
         sorted(plugins_root.rglob("plugin.json")) if plugins_root.is_dir() else []
     )
     discovered = _manifest_plugins(manifests, ".cursor-plugin")
+    for metadata in discovered.values():
+        if any(
+            _path_is_within(Path(source), installed_cache)
+            for source in metadata["sources"]
+        ):
+            metadata["enabled"] = True
     for name, metadata in _manifest_plugins(manifests, ".claude-plugin").items():
         for source in metadata["sources"]:
             _record_plugin(
@@ -318,6 +328,14 @@ def discover_cursor_plugins(home: Path | None = None) -> dict[str, dict[str, Any
                 version=version if isinstance(version, str) else None,
             )
     return discovered
+
+
+def _path_is_within(path: Path, parent: Path) -> bool:
+    try:
+        path.relative_to(parent)
+    except ValueError:
+        return False
+    return True
 
 
 def discover_opencode_plugins(home: Path | None = None) -> dict[str, dict[str, Any]]:
@@ -435,13 +453,28 @@ def resolve_capabilities(
     mcp_client = "codex" if client.startswith("codex-") else client
     base_profiles = _selected_repo_profiles(root, repo_name)
     profiles = _normalize_profiles(root, base_profiles, additional_profiles)
+    plugins = discover_client_plugins(client, home)
+    enabled_plugins = {
+        name for name, metadata in plugins.items() if metadata.get("enabled") is True
+    }
     active_servers = set(
-        effective_server_names(root, base_profiles, client=mcp_client)
+        effective_server_names(
+            root,
+            base_profiles,
+            client=mcp_client,
+            enabled_plugins=enabled_plugins,
+        )
     )
-    preview_servers = set(effective_server_names(root, profiles, client=mcp_client))
+    preview_servers = set(
+        effective_server_names(
+            root,
+            profiles,
+            client=mcp_client,
+            enabled_plugins=enabled_plugins,
+        )
+    )
     canonical = load_json(root / "mcp/canonical.json")
     servers = canonical["servers"]
-    plugins = discover_client_plugins(client, home)
     registered_plugins = {
         implementation["pluginName"]
         for capability in registry["capabilities"].values()
@@ -522,10 +555,20 @@ def resolve_capabilities(
         "previewProfiles": list(profiles),
         "temporaryProfiles": list(additional_profiles),
         "effectiveMcpServers": list(
-            effective_server_names(root, base_profiles, client=mcp_client)
+            effective_server_names(
+                root,
+                base_profiles,
+                client=mcp_client,
+                enabled_plugins=enabled_plugins,
+            )
         ),
         "previewMcpServers": list(
-            effective_server_names(root, profiles, client=mcp_client)
+            effective_server_names(
+                root,
+                profiles,
+                client=mcp_client,
+                enabled_plugins=enabled_plugins,
+            )
         ),
         "capabilities": resolved_capabilities,
         "discoveredPlugins": {
@@ -610,7 +653,7 @@ def _resolve_implementation(
         elif implementation.get("profile"):
             state = "available-profile"
         else:
-            state = "available"
+            state = "not-configured"
         session = "unknown" if configured else "not-active"
         enabled = configured
 

@@ -103,10 +103,26 @@ def load_plugin_registry(root: Path = ROOT) -> dict[str, Any]:
     return registry
 
 
-def plugin_owned_mcp_servers(client: str, root: Path = ROOT) -> dict[str, str]:
+def plugin_owned_mcp_servers(
+    client: str,
+    root: Path = ROOT,
+    *,
+    enabled_plugins: set[str] | None = None,
+) -> dict[str, str]:
+    """Return MCP ownership proven by this machine's enabled plugin state.
+
+    With no runtime evidence, return no ownership so tracked templates remain
+    portable fallbacks on a fresh machine.
+    """
     registry = load_plugin_registry(root)
     mappings = registry["mcpOwnership"].get(client, {})
-    return dict(mappings)
+    if enabled_plugins is None:
+        return {}
+    return {
+        server: plugin
+        for server, plugin in mappings.items()
+        if plugin in enabled_plugins
+    }
 
 
 def _validate_implementation(

@@ -11,7 +11,13 @@ from .capabilities import (
     resolve_capabilities,
 )
 from .config import ConfigError, ROOT
-from .evals import parse_variants, ratings_template, run_eval, score_run, write_run
+from .evals import (
+    parse_variants,
+    ratings_template,
+    run_eval,
+    score_run,
+    write_run,
+)
 from .lifecycle import draft_learning, record_correction
 from .mcp import render_all
 from .ops import apply_global, apply_repos, backup_global, restore_backup
@@ -85,7 +91,6 @@ def build_parser() -> argparse.ArgumentParser:
     eval_score = eval_subparsers.add_parser("score", help="aggregate calibrated ratings")
     eval_score.add_argument("run")
     eval_score.add_argument("ratings")
-
     learn = subparsers.add_parser("learn", help="record and review recurring corrections")
     learn_subparsers = learn.add_subparsers(dest="learn_command", required=True)
     learn_record = learn_subparsers.add_parser("record", help="record one correction")

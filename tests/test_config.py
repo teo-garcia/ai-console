@@ -5,38 +5,41 @@ import unittest
 from pathlib import Path
 
 from ai_console.config import ConfigError, load_repo_entries
-from tests.helpers import copy_template_tree, make_registry, write_json
+from tests.helpers import copy_template_tree, enable_test_profiles, make_registry, write_json
 
 
 class RegistryTests(unittest.TestCase):
     def test_resolves_logical_repo_through_local_binding(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = copy_template_tree(Path(temporary))
+            enable_test_profiles(root)
             repo = root / "repo"
-            registry, local = make_registry(root, repo, "semantic")
+            registry, local = make_registry(root, repo, "work")
 
             entries = load_repo_entries(root, registry, local)
 
             self.assertEqual(len(entries), 1)
             self.assertEqual(entries[0].name, "fixture")
             self.assertEqual(entries[0].path, repo)
-            self.assertEqual(entries[0].mcp_profiles, ("semantic",))
+            self.assertEqual(entries[0].mcp_profiles, ("work",))
 
     def test_resolves_additive_profiles_in_canonical_order(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = copy_template_tree(Path(temporary))
+            enable_test_profiles(root)
             repo = root / "repo"
             registry, local = make_registry(
-                root, repo, ["semantic", "browser"]
+                root, repo, ["work", "ops"]
             )
 
             entries = load_repo_entries(root, registry, local)
 
-            self.assertEqual(entries[0].mcp_profiles, ("browser", "semantic"))
+            self.assertEqual(entries[0].mcp_profiles, ("ops", "work"))
 
     def test_requires_binding_for_logical_repo(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = copy_template_tree(Path(temporary))
+            enable_test_profiles(root)
             registry = root / "registry.json"
             write_json(registry, {"repos": [{"name": "missing"}]})
 
@@ -68,7 +71,7 @@ class RegistryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = copy_template_tree(Path(temporary))
             repo = root / "repo"
-            registry, local = make_registry(root, repo, ["browser", "browser"])
+            registry, local = make_registry(root, repo, ["ops", "ops"])
 
             with self.assertRaisesRegex(ConfigError, "duplicate mcpProfiles"):
                 load_repo_entries(root, registry, local)
@@ -86,7 +89,7 @@ class RegistryTests(unittest.TestCase):
                         {
                             "name": "fixture",
                             "mcpProfile": "browser",
-                            "mcpProfiles": ["semantic"],
+                            "mcpProfiles": ["work"],
                         }
                     ]
                 },

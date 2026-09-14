@@ -40,7 +40,8 @@
 - Treat native tools, installed skills, plugins, apps or connectors, and MCP servers as distinct capability layers.
 - Infer the needed capability from the task and invoke it naturally. Do not require the user to name a plugin, choose a profile, or restart a conversation for an already configured capability.
 - Prefer each client's native tools and installed plugins before MCP: Codex Browser, Chrome, and Computer Use; Claude Web and Chrome; Cursor's built-in code, web, and plugin tools; and OpenCode's web, LSP, skills, and agents.
-- Use configured MCP only when the native client lacks the capability or the task explicitly needs that integration. Do not start optional MCP servers ambiently.
+- Keep the configured global capability baseline immediately available. Prefer native tools and installed plugins over duplicate MCP tools, and scope only integrations that require a project-specific target or materially different authority.
+- When coordinated terminal panes, parallel agent sessions, or worktree orchestration would materially help and Herdr is installed, use its CLI after inspecting the relevant `herdr --help` or subcommand help. Keep ordinary single-agent work direct.
 - Ask only at authentication, permission, or consequential action boundaries required by the active capability.
 - If a configured capability is unavailable, say so briefly and use the safest approved fallback.
 - Cross-check surprising output and summarize its implication instead of dumping logs.

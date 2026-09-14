@@ -56,7 +56,7 @@ mcp/
   local.example.json    # template for local.json
 ```
 
-Profile blocks in `canonical.json` bind profile-specific vars (e.g., `SERENA_CONTEXT=ide-assistant` vs `codex`). `local.json` binds machine-specific vars (`FILESYSTEM_ALLOWED_DIR`, `POSTGRES_URL`). Render fails explicitly on any unresolved variable.
+Profile blocks in `canonical.json` bind only portable integration settings. Machine-specific targets and credentials stay outside tracked configuration. Render fails explicitly on any unresolved variable.
 
 `ai-console render` writes the four tool-specific files from this model. Until cutover is validated, generated files remain checked in. After validation, git-ignore them.
 

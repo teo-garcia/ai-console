@@ -10,7 +10,12 @@ from pathlib import Path
 from typing import Any
 
 from .config import ConfigError, ROOT, expand_path, load_json, load_repo_entries
-from .mcp import PROFILE_FILENAMES, profile_config_path, render_profile_config
+from .mcp import (
+    PROFILE_FILENAMES,
+    profile_config_path,
+    render_global_config,
+    render_profile_config,
+)
 
 
 @dataclass
@@ -60,12 +65,24 @@ class Runner:
         if not self.dry_run:
             destination.unlink()
 
-    def write(self, destination: Path, content: str, backup: bool = False) -> None:
+    def write(
+        self,
+        destination: Path,
+        content: str,
+        backup: bool = False,
+        *,
+        replace_link_to: Path | None = None,
+    ) -> None:
         current = destination.read_text(encoding="utf-8") if destination.exists() else None
         if current == content:
             self.emit(f"unchanged: {destination}")
             return
-        if destination.is_symlink() and not self.force:
+        replaces_managed_link = (
+            destination.is_symlink()
+            and replace_link_to is not None
+            and Path(os.readlink(destination)) == replace_link_to
+        )
+        if destination.is_symlink() and not self.force and not replaces_managed_link:
             self.emit(
                 f"skip: {destination} is a symlink "
                 "(use --force to replace the link with a managed file)"
@@ -94,19 +111,24 @@ def _targets(root: Path) -> dict[str, Any]:
 
 def _managed_servers(root: Path) -> set[str]:
     canonical = load_json(root / "mcp/canonical.json")
-    names = canonical.get("managedServers")
-    if not isinstance(names, list) or not all(isinstance(name, str) for name in names):
-        raise ConfigError("canonical managedServers must be a string array")
-    return set(names)
+    names: set[str] = set()
+    for key in ("managedServers", "retiredServers"):
+        values = canonical.get(key, [])
+        if not isinstance(values, list) or not all(
+            isinstance(name, str) for name in values
+        ):
+            raise ConfigError(f"canonical {key} must be a string array")
+        names.update(values)
+    return names
 
 
 def merge_codex_config(existing: str, managed: set[str], baseline: str) -> str:
     kept: list[str] = []
     inside_managed = False
     header = re.compile(
-        r'^\s*\[mcp_servers\.(?:"([^"]+)"|([A-Za-z0-9_-]+))(?:\.|\])'
+        r'^\s*(?:#\s*)?\[mcp_servers\.(?:"([^"]+)"|([A-Za-z0-9_-]+))(?:\.|\])'
     )
-    any_table = re.compile(r"^\s*\[")
+    any_table = re.compile(r"^\s*(?:#\s*)?\[")
     for line in existing.splitlines(keepends=True):
         if line.strip() == "## Codex MCP servers" or line.startswith(
             "## Managed by ai-console"
@@ -316,6 +338,19 @@ def apply_global(
             raise ConfigError(f"missing global target {client}.{key}")
         return expand_path(value, active_home)
 
+    def enabled_plugins(client: str) -> set[str]:
+        # Imported lazily because capability resolution itself depends on MCP
+        # rendering. Apply-time discovery is machine-local runtime evidence.
+        from .capabilities import discover_client_plugins
+
+        discovery_client = "codex-cli" if client == "codex" else client
+        discovered = discover_client_plugins(discovery_client, active_home)
+        return {
+            name
+            for name, metadata in discovered.items()
+            if metadata.get("enabled") is True
+        }
+
     codex_skills = target("codex", "skillsDir")
     cursor_skills = target("cursor", "skillsDir")
     claude_skills = target("claude", "skillsDir")
@@ -371,7 +406,9 @@ def apply_global(
         if codex_destination.exists()
         else ""
     )
-    codex_baseline = (root / "mcp/codex.config.toml").read_text(encoding="utf-8")
+    codex_baseline = render_global_config(
+        root, "codex", enabled_plugins=enabled_plugins("codex")
+    )
     codex_merged = merge_codex_config(codex_existing, managed, codex_baseline)
     codex_status = load_json(root / "status-lines/codex.json").get("items")
     if not isinstance(codex_status, list):
@@ -384,7 +421,11 @@ def apply_global(
 
     claude_destination = target("claude", "mcpConfig")
     claude_existing = load_json(claude_destination) if claude_destination.exists() else {}
-    claude_baseline = load_json(root / "mcp/claude.mcp.json")
+    claude_baseline = json.loads(
+        render_global_config(
+            root, "claude", enabled_plugins=enabled_plugins("claude")
+        )
+    )
     claude_merged = merge_claude_config(claude_existing, managed, claude_baseline)
     runner.write(
         claude_destination,
@@ -392,7 +433,26 @@ def apply_global(
         backup=True,
     )
 
-    runner.link(root / "mcp/cursor.mcp.json", target("cursor", "mcpConfig"))
+    cursor_mcp_destination = target("cursor", "mcpConfig")
+    cursor_mcp_existing = (
+        load_json(cursor_mcp_destination)
+        if cursor_mcp_destination.exists()
+        else {}
+    )
+    cursor_mcp_baseline = json.loads(
+        render_global_config(
+            root, "cursor", enabled_plugins=enabled_plugins("cursor")
+        )
+    )
+    cursor_mcp_merged = merge_claude_config(
+        cursor_mcp_existing, managed, cursor_mcp_baseline
+    )
+    runner.write(
+        cursor_mcp_destination,
+        json.dumps(cursor_mcp_merged, indent=2) + "\n",
+        backup=True,
+        replace_link_to=root / "mcp/cursor.mcp.json",
+    )
     runner.link(root / "mcp/opencode.jsonc", target("opencode", "mcpConfig"))
     cursor_destination = target("cursor", "cliConfig")
     cursor_existing = load_json(cursor_destination) if cursor_destination.exists() else {}

@@ -11,9 +11,7 @@ from ai_console.mcp import (
     CLIENTS,
     effective_server_names,
     expected_outputs,
-    profile_config_path,
     render_all,
-    render_profile_config,
     server_for_client,
 )
 from ai_console.rules import expected_rule_outputs, render_rules
@@ -21,10 +19,11 @@ from tests.helpers import copy_template_tree
 
 
 class McpRenderingTests(unittest.TestCase):
-    def test_all_expected_outputs_parse_and_have_no_placeholders(self) -> None:
-        outputs = expected_outputs()
+    def test_global_outputs_parse_and_expose_the_capability_baseline(self) -> None:
+        root = Path(__file__).resolve().parent.parent
+        outputs = expected_outputs(root)
 
-        self.assertGreaterEqual(len(outputs), len(CLIENTS) * 6)
+        self.assertEqual(len(outputs), len(CLIENTS))
         for path, content in outputs.items():
             self.assertNotIn("${", content, path)
             if path.suffix == ".toml":
@@ -32,25 +31,33 @@ class McpRenderingTests(unittest.TestCase):
             else:
                 json.loads(content)
 
-        codex = outputs[Path(__file__).resolve().parent.parent / "mcp/codex.config.toml"]
-        self.assertIn('default_tools_approval_mode = "auto"', codex)
-        cursor = json.loads(
-            outputs[Path(__file__).resolve().parent.parent / "mcp/cursor.mcp.json"]
+        codex = outputs[root / "mcp/codex.config.toml"]
+        self.assertIn("[mcp_servers.context7]", codex)
+        self.assertIn("[mcp_servers.atlassian]", codex)
+        self.assertIn("[mcp_servers.chrome-devtools]", codex)
+        self.assertNotIn("[mcp_servers.github]", codex)
+
+        claude = json.loads(outputs[root / "mcp/claude.mcp.json"])
+        self.assertEqual(
+            list(claude["mcpServers"]),
+            ["context7", "chrome-devtools", "datadog", "atlassian", "circleci"],
         )
-        self.assertNotIn("context7", cursor["mcpServers"])
-        opencode = json.loads(
-            outputs[Path(__file__).resolve().parent.parent / "mcp/opencode.jsonc"]
+        cursor = json.loads(outputs[root / "mcp/cursor.mcp.json"])
+        self.assertEqual(
+            list(cursor["mcpServers"]),
+            ["context7", "chrome-devtools", "datadog", "atlassian", "circleci"],
         )
+
+        opencode = json.loads(outputs[root / "mcp/opencode.jsonc"])
         self.assertEqual(
             opencode["plugin"],
             [["opencode-goal-plugin@0.8.2", {"persistState": False}]],
         )
         self.assertIn("goal", opencode["command"])
-        browser = outputs[
-            Path(__file__).resolve().parent.parent
-            / "mcp/profiles/browser/codex.config.toml"
-        ]
-        self.assertIn('default_tools_approval_mode = "writes"', browser)
+        self.assertEqual(
+            set(opencode["mcp"]),
+            {"context7", "chrome-devtools", "datadog", "atlassian", "circleci"},
+        )
 
     def test_render_check_detects_and_repairs_drift(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -73,78 +80,75 @@ class McpRenderingTests(unittest.TestCase):
         with self.assertRaisesRegex(ConfigError, "missing client value"):
             server_for_client(server, "cursor")
 
-    def test_serena_profile_uses_central_cache_without_repo_data(self) -> None:
+    def test_portable_templates_keep_fallbacks_without_runtime_plugin_evidence(self) -> None:
         root = Path(__file__).resolve().parent.parent
-        outputs = expected_outputs(root)
-
-        for client, filename in {
-            "codex": "codex.config.toml",
-            "claude": "claude.mcp.json",
-            "cursor": "cursor.mcp.json",
-            "opencode": "opencode.jsonc",
-        }.items():
-            content = outputs[root / "mcp/profiles/semantic" / filename]
-            self.assertIn("SERENA_HOME", content, client)
-            self.assertIn("project_serena_folder_location", content, client)
-            self.assertIn("--enable-web-dashboard false", content, client)
-            self.assertNotIn('$projectDir/.serena', content, client)
-
-    def test_additive_profile_render_unions_servers_without_global_baseline(self) -> None:
-        content = render_profile_config(
-            Path(__file__).resolve().parent.parent,
-            ("browser", "semantic"),
-            "codex",
+        all_servers = (
+            "context7",
+            "chrome-devtools",
+            "datadog",
+            "atlassian",
+            "circleci",
         )
 
-        self.assertIn("[mcp_servers.chrome-devtools]", content)
-        self.assertIn("[mcp_servers.serena]", content)
-        self.assertNotIn("[mcp_servers.context7]", content)
-
-        opencode = json.loads(
-            render_profile_config(
-                Path(__file__).resolve().parent.parent,
-                ("browser", "semantic"),
-                "opencode",
-            )
+        self.assertEqual(effective_server_names(root, ()), all_servers)
+        self.assertEqual(
+            effective_server_names(root, (), client="codex"),
+            all_servers,
         )
-        self.assertNotIn("plugin", opencode)
-        self.assertNotIn("command", opencode)
+        self.assertEqual(
+            effective_server_names(root, (), client="claude"),
+            all_servers,
+        )
+        self.assertEqual(
+            effective_server_names(root, (), client="cursor"),
+            all_servers,
+        )
 
-    def test_effective_servers_are_lean_and_profile_compatible(self) -> None:
+    def test_runtime_plugin_evidence_suppresses_only_proven_owners(self) -> None:
         root = Path(__file__).resolve().parent.parent
-
-        servers = effective_server_names(root, ("browser", "semantic"))
 
         self.assertEqual(
-            servers,
-            (
-                "context7",
-                "chrome-devtools",
-                "serena",
+            effective_server_names(
+                root,
+                (),
+                client="cursor",
+                enabled_plugins={"context7-plugin", "devtools-for-agents"},
             ),
+            ("datadog", "atlassian", "circleci"),
         )
         self.assertEqual(
-            profile_config_path(root, ("browser", "semantic"), "codex"),
-            root / "mcp/composed/browser+semantic/codex.config.toml",
+            effective_server_names(
+                root,
+                (),
+                client="cursor",
+                enabled_plugins={
+                    "context7-plugin",
+                    "devtools-for-agents",
+                    "datadog",
+                    "atlassian",
+                    "circleci",
+                },
+            ),
+            (),
         )
-
-    def test_global_catalog_contains_only_the_lean_baseline(self) -> None:
-        root = Path(__file__).resolve().parent.parent
-
         self.assertEqual(
-            effective_server_names(root, ()),
-            ("context7",),
+            effective_server_names(
+                root,
+                (),
+                client="claude",
+                enabled_plugins={"context7", "chrome-devtools-mcp"},
+            ),
+            ("datadog", "atlassian", "circleci"),
         )
 
-    def test_rules_render_from_one_lean_source_with_cursor_metadata(self) -> None:
+    def test_rules_render_from_one_source_with_cursor_metadata(self) -> None:
         outputs = expected_rule_outputs()
         source = next(
-            content
-            for path, content in outputs.items()
-            if path.name == "AGENTS.md"
+            content for path, content in outputs.items() if path.name == "AGENTS.md"
         )
 
         self.assertLess(len(source.splitlines()), 130)
+        self.assertIn("immediately available", source)
         cursor = next(content for path, content in outputs.items() if path.suffix == ".mdc")
         self.assertTrue(cursor.startswith("---\n"))
         self.assertIn("alwaysApply: true", cursor)

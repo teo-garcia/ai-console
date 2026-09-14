@@ -92,7 +92,7 @@ class CapabilityResolutionTests(unittest.TestCase):
                             for item in by_name["observability"]["implementations"]
                             if item["id"] == "datadog"
                         )["state"],
-                        "available-profile",
+                        "configured",
                     )
                     self.assertEqual(
                         by_name["desktop-control"]["preferred"],
@@ -109,10 +109,10 @@ class CapabilityResolutionTests(unittest.TestCase):
                     self.assertIn("documents", payload["unmappedPlugins"])
 
     @patch("ai_console.capabilities.shutil.which")
-    def test_cli_compatibility_profile_preview_does_not_change_ambient_mcp(
+    def test_global_integrations_are_immediately_configured_without_profiles(
         self, which: MagicMock
     ) -> None:
-        available_commands = {"/bin/sh", "npx", "rg"}
+        available_commands = {"/bin/sh", "npx", "rg", "herdr"}
         which.side_effect = lambda command: (
             command if command.startswith("/") else f"/usr/bin/{command}"
         ) if command in available_commands else None
@@ -120,31 +120,36 @@ class CapabilityResolutionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             home = Path(temporary)
 
-            payload = resolve_capabilities(
-                client="codex-cli",
-                additional_profiles=("browser", "semantic"),
-                home=home,
-            )
+            payload = resolve_capabilities(client="opencode", home=home)
 
             self.assertEqual(payload["profiles"], [])
-            self.assertEqual(payload["previewProfiles"], ["browser", "semantic"])
+            self.assertEqual(payload["previewProfiles"], [])
             self.assertEqual(
                 payload["effectiveMcpServers"],
-                ["context7"],
+                [
+                    "context7",
+                    "chrome-devtools",
+                    "datadog",
+                    "atlassian",
+                    "circleci",
+                ],
             )
-            self.assertEqual(
-                payload["previewMcpServers"],
-                ["context7", "chrome-devtools", "serena"],
-            )
+            self.assertEqual(payload["previewMcpServers"], payload["effectiveMcpServers"])
             by_name = {item["name"]: item for item in payload["capabilities"]}
             self.assertEqual(
-                by_name["browser-testing"]["implementations"][1]["state"],
-                "planned-profile",
+                by_name["browser-testing"]["implementations"][0]["state"],
+                "configured",
             )
-            self.assertIsNone(by_name["browser-testing"]["preferred"])
             self.assertEqual(
-                by_name["browser-testing"]["previewPreferred"],
+                by_name["browser-testing"]["preferred"],
                 "chrome-devtools",
+            )
+            self.assertEqual(
+                by_name["work-tracking"]["preferred"],
+                "atlassian",
+            )
+            self.assertEqual(
+                by_name["terminal-orchestration"]["preferred"], "herdr-cli"
             )
             self.assertEqual(by_name["code-navigation"]["preferred"], "ripgrep")
 
@@ -165,11 +170,11 @@ class CapabilityResolutionTests(unittest.TestCase):
                 for item in payload["capabilities"]
                 if item["name"] == "browser-testing"
             )
-            self.assertIsNone(browser["preferred"])
+            self.assertEqual(browser["preferred"], "chrome-devtools")
             self.assertEqual(browser["implementations"][0]["state"], "disabled")
             self.assertIs(browser["implementations"][0]["enabled"], False)
             self.assertEqual(
-                browser["implementations"][1]["state"], "available-profile"
+                browser["implementations"][1]["state"], "configured"
             )
 
     def test_unknown_temporary_profile_is_rejected(self) -> None:
@@ -197,8 +202,23 @@ class CapabilityResolutionTests(unittest.TestCase):
                 {"name": "linter", "version": "1.2.0"},
             )
             write_json(
+                home
+                / ".claude/plugins/cache/test/context7/.claude-plugin/plugin.json",
+                {"name": "context7", "version": "1.0.0"},
+            )
+            write_json(
+                home
+                / ".claude/plugins/marketplaces/test/catalog-only/.claude-plugin/plugin.json",
+                {"name": "catalog-only", "version": "9.9.9"},
+            )
+            write_json(
                 home / ".claude/settings.json",
-                {"enabledPlugins": {"linter@official": True}},
+                {
+                    "enabledPlugins": {
+                        "linter@official": True,
+                        "context7@official": True,
+                    }
+                },
             )
             write_json(
                 home / ".cursor/plugins/local/review/.cursor-plugin/plugin.json",
@@ -208,6 +228,11 @@ class CapabilityResolutionTests(unittest.TestCase):
                 home
                 / ".cursor/plugins/cache/cursor-public/context7-plugin/revision/.claude-plugin/plugin.json",
                 {"name": "context7-plugin"},
+            )
+            write_json(
+                home
+                / ".cursor/plugins/cache/cursor-public/devtools/revision/.cursor-plugin/plugin.json",
+                {"name": "devtools-for-agents", "version": "1.0.0"},
             )
             opencode_plugin = (
                 home / ".config/opencode/plugins/herdr-agent-state.js"
@@ -219,16 +244,45 @@ class CapabilityResolutionTests(unittest.TestCase):
                 {"plugin": [["@scope/tools@3.0.0", {"enabled": True}]]},
             )
 
-            self.assertIs(discover_claude_plugins(home)["linter"]["enabled"], True)
+            claude = discover_claude_plugins(home)
+            self.assertIs(claude["linter"]["enabled"], True)
+            self.assertIs(claude["context7"]["enabled"], True)
+            self.assertNotIn("catalog-only", claude)
             self.assertEqual(
                 discover_cursor_plugins(home)["review"]["versions"], ["2.0.0"]
             )
             self.assertIs(
                 discover_cursor_plugins(home)["context7-plugin"]["enabled"], True
             )
+            self.assertEqual(
+                discover_cursor_plugins(home)["devtools-for-agents"]["versions"],
+                ["1.0.0"],
+            )
+            self.assertIs(
+                discover_cursor_plugins(home)["devtools-for-agents"]["enabled"],
+                True,
+            )
             opencode = discover_opencode_plugins(home)
             self.assertIs(opencode["herdr-agent-state"]["enabled"], True)
             self.assertIn("@scope/tools", opencode)
+
+            claude_payload = resolve_capabilities(client="claude", home=home)
+            claude_docs = next(
+                item
+                for item in claude_payload["capabilities"]
+                if item["name"] == "library-docs"
+            )
+            self.assertEqual(claude_docs["preferred"], "claude-context7-plugin")
+
+            cursor_payload = resolve_capabilities(client="cursor", home=home)
+            cursor_browser = next(
+                item
+                for item in cursor_payload["capabilities"]
+                if item["name"] == "browser-testing"
+            )
+            self.assertEqual(
+                cursor_browser["preferred"], "cursor-chrome-devtools-plugin"
+            )
 
     def test_native_capability_matrix_exposes_each_clients_strengths(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -306,9 +360,9 @@ class CapabilityResolutionTests(unittest.TestCase):
             report = format_capability_report(payload)
 
             self.assertIn("browser-testing", report)
-            self.assertIn("chrome-devtools: available-profile", report)
+            self.assertIn("chrome-devtools: configured", report)
             self.assertIn(
-                "browser-testing [interactive/lazy] preferred=unavailable", report
+                "browser-testing [interactive/lazy] preferred=chrome-devtools", report
             )
 
     @patch("ai_console.capabilities.socket.create_connection")
@@ -327,7 +381,7 @@ class CapabilityResolutionTests(unittest.TestCase):
         self.assertEqual(
             docs["implementations"][0]["reachable"], "reachable"
         )
-        self.assertEqual(create_connection.call_count, 1)
+        self.assertEqual(create_connection.call_count, 4)
 
 
 if __name__ == "__main__":

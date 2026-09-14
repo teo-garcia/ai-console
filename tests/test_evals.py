@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -23,7 +22,10 @@ class EvalCorpusTests(unittest.TestCase):
         corpus = load_corpus(PROJECT_ROOT / "evals/cases.json")
 
         self.assertGreaterEqual(len(corpus["cases"]), 10)
-        self.assertEqual(len({case["id"] for case in corpus["cases"]}), len(corpus["cases"]))
+        self.assertEqual(
+            len({case["id"] for case in corpus["cases"]}),
+            len(corpus["cases"]),
+        )
 
     def test_each_adapter_uses_noninteractive_constrained_mode(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

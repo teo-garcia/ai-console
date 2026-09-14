@@ -6,8 +6,18 @@
     "selection": "Install only a plugin that fills a native gap or adds useful skills, agents, hooks, or auth around an integration."
   },
   "mcpOwnership": {
+    "claude": {
+      "context7": "context7",
+      "chrome-devtools": "chrome-devtools-mcp",
+      "datadog": "datadog",
+      "atlassian": "atlassian"
+    },
     "cursor": {
-      "context7": "context7-plugin"
+      "context7": "context7-plugin",
+      "chrome-devtools": "devtools-for-agents",
+      "datadog": "datadog",
+      "atlassian": "atlassian",
+      "circleci": "circleci"
     }
   },
   "selected": {
@@ -49,6 +59,38 @@
         "activation": "lazy",
         "capabilities": ["semantic-code-intelligence"],
         "requiresCommand": "typescript-language-server"
+      },
+      {
+        "name": "context7",
+        "source": "claude-plugins-official",
+        "management": "marketplace",
+        "activation": "lazy",
+        "capabilities": ["library-docs"],
+        "replacesMcp": "context7"
+      },
+      {
+        "name": "chrome-devtools-mcp",
+        "source": "claude-plugins-official",
+        "management": "marketplace",
+        "activation": "lazy",
+        "capabilities": ["browser-testing"],
+        "replacesMcp": "chrome-devtools"
+      },
+      {
+        "name": "datadog",
+        "source": "claude-plugins-official",
+        "management": "marketplace",
+        "activation": "lazy",
+        "capabilities": ["observability"],
+        "replacesMcp": "datadog"
+      },
+      {
+        "name": "atlassian",
+        "source": "claude-plugins-official",
+        "management": "marketplace",
+        "activation": "lazy",
+        "capabilities": ["work-tracking"],
+        "replacesMcp": "atlassian"
       }
     ],
     "cursor": [
@@ -59,6 +101,38 @@
         "activation": "lazy",
         "capabilities": ["library-docs"],
         "replacesMcp": "context7"
+      },
+      {
+        "name": "devtools-for-agents",
+        "source": "cursor-public",
+        "management": "marketplace",
+        "activation": "lazy",
+        "capabilities": ["browser-testing"],
+        "replacesMcp": "chrome-devtools"
+      },
+      {
+        "name": "datadog",
+        "source": "cursor-public",
+        "management": "marketplace",
+        "activation": "lazy",
+        "capabilities": ["observability"],
+        "replacesMcp": "datadog"
+      },
+      {
+        "name": "atlassian",
+        "source": "cursor-public",
+        "management": "marketplace",
+        "activation": "lazy",
+        "capabilities": ["work-tracking"],
+        "replacesMcp": "atlassian"
+      },
+      {
+        "name": "circleci",
+        "source": "cursor-public",
+        "management": "marketplace",
+        "activation": "lazy",
+        "capabilities": ["continuous-integration"],
+        "replacesMcp": "circleci"
       }
     ],
     "opencode": [
@@ -69,6 +143,13 @@
         "activation": "global",
         "version": "0.8.2",
         "capabilities": ["long-running-goal"]
+      },
+      {
+        "name": "herdr-agent-state",
+        "source": "herdr",
+        "management": "generated",
+        "activation": "global",
+        "capabilities": ["terminal-session-state"]
       }
     ]
   },

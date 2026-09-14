@@ -7,7 +7,7 @@ verbosity, native tools, plugins, and ordinary permissions to each client.
 ## Design
 
 - One universal rules source, rendered into each client’s native format.
-- One lightweight global MCP server (Context7); optional servers stay off.
+- One global capability baseline, with plugin-owned MCP duplicates suppressed.
 - A small general-purpose skill allowlist; deeper playbooks load on demand.
 - Installed native tools, skills, plugins, apps, and connectors activate on demand.
 - Tracked logical configuration separated from ignored machine-local bindings.
@@ -104,28 +104,35 @@ on demand and remove it after the task.
 
 ## Standardized plugins
 
-`config/plugins.json` records the minimal selected plugin set, MCP ownership, and
-the shared precedence contract: native > plugin > MCP > CLI. A standardized
-capability does not imply installing the same package everywhere. Native support
-wins; an enabled plugin wins over a duplicate standalone MCP only when the
-plugin owns the integration; otherwise the MCP remains the portable fallback.
+`config/plugins.json` records the minimal selected plugin set and MCP ownership.
+Provider precedence applies only after the task has been mapped to a capability:
+within that capability, prefer a sufficient native provider, then an installed
+plugin, MCP, and CLI fallback. A standardized capability does not imply installing
+the same package everywhere. An enabled plugin wins over a duplicate standalone
+MCP when the plugin owns that integration.
 
-The selected baseline is deliberately small:
+The selected baseline is client-specific and user-scoped:
 
 | Client | Selected plugins | Why |
 | --- | --- | --- |
-| Codex | Runtime Browser, Chrome, Computer Use; curated GitHub | Lazy native bundles already supplied by Codex |
-| Claude Code | Official `typescript-lsp` | Uses the installed `typescript-language-server` with no always-on prompt payload |
-| Cursor | Verified `context7-plugin` | Adds `/docs`, a documentation skill, and a focused research subagent in addition to Context7 MCP |
-| OpenCode | Pinned `opencode-goal-plugin@0.8.2` | Fills a native capability gap without repository state |
+| Codex | Runtime Browser, Chrome, Computer Use; curated GitHub | Lazy bundles supplied by Codex; Datadog and CircleCI fall back to MCP because the account administrator blocks their curated plugins |
+| Claude Code | `typescript-lsp`, Context7, Chrome DevTools, Datadog, Atlassian | Official user-scope plugins replace four duplicate standalone MCP registrations and add focused skills where available |
+| Cursor | Context7 installed; Chrome Devtools for Agents, Datadog, Atlassian, CircleCI selected | Context7 replaces its MCP now; the four reviewed marketplace packages remain optional because working MCP fallbacks are already global |
+| OpenCode | `opencode-goal-plugin@0.8.2`; Herdr state reporter | No verified ecosystem plugin replaces these five MCPs; Herdr reports pane state without repository files |
 
-Cursor's Context7 plugin owns that integration, so generated Cursor MCP config
-does not also preload the standalone Context7 server. Claude's Context7 and
-GitHub marketplace entries are plain MCP wrappers; they are not installed just
-to change packaging. Datadog plugins are recognized as preferred replacements,
-but Datadog remains uninstalled and inactive until an operational task justifies
-authentication. Claude's preview Datadog plugin is especially not baseline
-because it adds session hooks and an always-on prompt contribution.
+Claude's installed plugins own Context7, Chrome DevTools, Datadog, and Atlassian,
+so only CircleCI remains in the applied Claude MCP config. Cursor's installed
+Context7 plugin owns that integration; the four selected marketplace plugins do
+not suppress their MCP fallbacks until installation is verified locally. Datadog's
+Claude hooks run only after visualization tools and at
+session end; they are not an ambient prompt payload. Authentication stays lazy
+and client-local.
+
+Codex uses one MCP configuration for Desktop, CLI, and IDE, but Codex plugins are
+not available in the IDE. The five MCP entries therefore remain in the shared
+config: Desktop/CLI prefer native or installed plugins, and the IDE retains
+working fallbacks. Curated Datadog and CircleCI plugins exist in the catalog but
+are disabled by this account's administrator.
 
 The cross-client goal contract is:
 
@@ -160,12 +167,11 @@ release instead of floating to the latest package at session startup.
 ## Capability resolution
 
 `config/capabilities.json` reports native tools, plugins, MCP servers, and CLI
-fallbacks without activating them, starting a server, changing a profile, or
-promising current-session access. Selection is ranked by capability kind instead
-of JSON list order, so an enabled plugin cannot accidentally lose to a duplicate
-MCP merely because the MCP was declared first. Reports show lower-priority active
-implementations as shadowed and warn when a plugin and the MCP it supersedes are
-both active.
+fallbacks without invoking a tool or promising authentication or current-session
+access. Selection is ranked by capability kind instead of JSON list order, so an
+enabled plugin cannot accidentally lose to a duplicate MCP merely because the
+MCP was declared first. Reports show lower-priority active implementations as
+shadowed and warn when a plugin and the MCP it supersedes are both active.
 
 Inspect what a client can use now:
 
@@ -176,12 +182,17 @@ scripts/ai-console doctor --client codex-cli --repo ai-console
 ```
 
 Ask for the outcome directly: “test the login flow” or “trace this symbol.” The
-rules tell each client to prefer its native capability. Explicit selectors and
-MCP profiles are opt-in overrides. `doctor --live` adds bounded TCP reachability
+rules tell each client to prefer its native capability or installed plugin, then
+the globally configured MCP fallback. No profile name is required. Explicit
+selectors are optional overrides. `doctor --live` adds bounded TCP reachability
 checks; normal doctor and CI remain network-free.
 
 The resolver reports configuration separately from authentication, reachability,
-and current-session activation. It never installs or invokes a tool.
+and current-session activation. It never installs or invokes a tool. Serena and
+Codebase Memory were evaluated and retired after neither was naturally selected,
+both added cold-start/cache cost, and neither improved the successful native
+result. The measured decision is preserved in
+`docs/plans/capability-pilot-2026-09-14.md`.
 
 The inventory is outcome-oriented and preserves each client's native path:
 Claude web and optional LSP plugins, Cursor code intelligence and built-in review,
@@ -200,37 +211,47 @@ The client-specific claims track the current official documentation for
 [OpenCode tools](https://opencode.ai/docs/tools).
 
 Codex MCP output also renders least-surprising approval defaults from the same
-policy: Context7 uses `auto`, browser/code-navigation/index/memory servers use
-`writes`, and Datadog uses `prompt`. Capability validation fails if its declared
+policy: Context7 uses `auto`, Chrome DevTools and GitHub use `writes`, and remote
+service integrations use `prompt`. Capability validation fails if its declared
 approval or authentication policy drifts from the canonical MCP definition.
 
 ## MCP configuration
 
 `mcp/canonical.json` is the only hand-edited MCP definition. `scripts/render`
-generates global configs for all four clients. Remote Context7 is global for
-Codex, Claude, and OpenCode. Cursor receives it through its selected plugin, so
-its generated standalone MCP baseline is empty.
-Chrome DevTools, Codebase Memory, Serena, Basic Memory, and Datadog remain
-available as opt-in profiles, but none starts in an ordinary session. Serena's
-semantic profile relocates its home and per-project data under the user's cache
-directory, so activating it does not create repo-local `.serena` directories.
-Rendered files contain no fixed home-directory paths.
+generates a global baseline for all four clients: Context7, Chrome DevTools,
+Datadog, Atlassian, and CircleCI. The tracked outputs deliberately retain all
+five portable fallbacks. `scripts/apply-global` then discovers enabled plugins on
+the current computer and suppresses only the MCPs those plugins are proven to
+own. On this computer, Claude receives only CircleCI, Cursor receives every MCP
+except Context7, and OpenCode receives all five. Codex retains all five because
+its shared config also serves the plugin-less IDE; Desktop and CLI still prefer
+their native or installed plugins.
+Rendered files contain no fixed home-directory paths or credentials. OAuth and
+service approval stay client-local.
+
+On another computer, clone the repository and run `scripts/apply-global`: every
+fallback is immediately available even if no marketplace plugin has been
+installed. Install any optional client plugin later and rerun the same command;
+only its now-redundant MCP is removed. No capability profile or repository-local
+state is required.
+
+GitHub is immediately available through Codex's installed GitHub plugin and the
+authenticated `gh` CLI in every client. The hosted GitHub MCP is not baseline:
+live client checks showed that its endpoint requires a PAT header or a host-owned
+OAuth app, so generic MCP OAuth fails in Claude, Cursor, and OpenCode. AI-console
+does not copy a GitHub token into generated configuration merely to force MCP
+packaging.
 
 MCP is only one capability layer. Native client tools, installed skills,
 plugins, apps, and connectors remain available on demand even when their tool
 schemas are not preloaded into a new session. Ask for the capability naturally;
 an explicit client selector such as `@Browser` is an override, not a requirement.
 
-| Internal bundle | Capability | Intended use |
-| --- | --- | --- |
-| `browser` | Chrome DevTools | DOM, console, network, screenshots, performance |
-| `codebase` | Codebase Memory | Indexed structure and impact analysis |
-| `memory` | Basic Memory | Durable cross-client Markdown knowledge |
-| `semantic` | Serena | Symbol-aware navigation and refactoring |
-| `ops` | Datadog | Operational investigation and observability |
-
-These bundles are explicit compatibility fallbacks, not prerequisites for native
-client tools. New repository entries should use no MCP overrides:
+These integrations are configured globally, but clients invoke tools only when
+the task needs them. A remote service may request one-time OAuth or server
+approval on first use. Chrome DevTools can launch its own isolated browser; a
+signed-in existing Chrome session still uses the client's native integration
+where supported. New repository entries need no MCP overrides:
 
 ```json
 {
@@ -248,10 +269,10 @@ client tools. New repository entries should use no MCP overrides:
 }
 ```
 
-Legacy `mcpProfile` and `mcpProfiles` keys are still accepted for existing
-installations. Duplicate, unknown, or mixed singular/plural selections fail
-before anything is applied. Leave `mcpProfiles` empty unless a repository
-explicitly needs one optional MCP fallback.
+The generic `mcpProfile` and `mcpProfiles` mechanism remains available for a
+future project-specific target or authority boundary, but this repository ships
+no named profiles. Duplicate, unknown, or mixed singular/plural selections fail
+before anything is applied. Normal repositories leave `mcpProfiles` empty.
 
 For backwards compatibility, non-empty selections still render portable client
 configs under the ignored `mcp/composed/` cache. Applying repositories also
@@ -292,17 +313,30 @@ Local binding, stored only in ignored `registry/repos.local.json`:
 }
 ```
 
-The verifier scans canonical, global, and every profile output for machine home
-paths and fails on generated drift.
+The verifier scans canonical, global, and any future profile output for machine
+home paths and fails on generated drift.
 
-Profiles are compatibility packaging, not a prerequisite the user must name in
-their prompt. Bind a profile only for repositories that actually need its MCP
-integration; otherwise each client should prefer its native capability.
+Profiles are reserved infrastructure for future project-specific targets or
+authority—not a prerequisite the user must name in a prompt. The normal baseline
+is global.
+
+Herdr is a separate cross-client terminal orchestrator, not an MCP server. The
+shared rules tell every client it is available for persistent workspaces,
+coordinated panes, agent sessions, worktrees, and handoffs when that complexity
+materially helps. OpenCode's global `herdr-agent-state` plugin only synchronizes
+working, blocked, and idle state with the owning pane; it does not replace the
+Herdr CLI or write repository state. Ordinary single-agent work stays direct.
+
+PostgreSQL is intentionally not a global MCP integration. The former MCP project
+server is archived, database targets and credentials are project-specific, and
+the local `psql` fallback is used only after the user names an authorized target
+with least-privilege credentials. Add a database MCP later only as a target-bound,
+reviewed profile—not as ambient global context.
 
 ### Datadog authentication
 
-Datadog is not ambient. If the `ops` profile is deliberately selected,
-the endpoint targets US5 and OAuth credentials remain client-local:
+Datadog targets US5. Authentication remains client-local, so first use may
+require the active client's plugin setup or MCP login:
 
 ```sh
 codex mcp login datadog
@@ -391,8 +425,8 @@ scripts/verify --scope install
 ```
 
 The standard-library test suite covers canonical rendering, portability,
-registry binding, dry-run immutability, merge preservation, all-client profile
-links, disabled startup integrations, native agents, routing, and backup/restore
+registry binding, dry-run immutability, merge preservation, global all-client
+integrations, generic scoped overrides, native agents, routing, and backup/restore
 round trips. `.github/workflows/verify.yml` runs the same core checks on pushes
 and pull requests.
 

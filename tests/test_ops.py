@@ -9,6 +9,7 @@ from pathlib import Path
 from ai_console.config import ConfigError
 from ai_console.ops import (
     Runner,
+    _managed_servers,
     apply_global,
     apply_repos,
     backup_global,
@@ -20,7 +21,12 @@ from ai_console.ops import (
     merge_nested_config,
     restore_backup,
 )
-from tests.helpers import PROJECT_ROOT, copy_template_tree, make_registry
+from tests.helpers import (
+    PROJECT_ROOT,
+    copy_template_tree,
+    enable_test_profiles,
+    make_registry,
+)
 
 
 class RunnerTests(unittest.TestCase):
@@ -65,6 +71,13 @@ class RunnerTests(unittest.TestCase):
 
 
 class MergeTests(unittest.TestCase):
+    def test_retired_servers_remain_managed_for_cleanup(self) -> None:
+        managed = _managed_servers(PROJECT_ROOT)
+
+        self.assertIn("context7", managed)
+        self.assertIn("serena", managed)
+        self.assertIn("codebase-memory", managed)
+
     def test_codex_status_line_replaces_only_managed_tui_key(self) -> None:
         existing = '[tui]\nstatus_line = ["old"]\nsession_picker_view = "comfortable"\n\n[features]\nflag = true\n'
 
@@ -117,6 +130,22 @@ url = \"https://example.test\"
         self.assertIn("[features]", merged)
         self.assertNotIn('TOKEN = "stale"', merged)
         self.assertEqual(merged.count("[mcp_servers.context7]"), 1)
+
+    def test_codex_merge_removes_commented_retired_server_block(self) -> None:
+        existing = """model = \"custom\"
+
+# [mcp_servers.serena]
+# command = \"uvx\"
+# args = [\"serena\"]
+
+[mcp_servers.private]
+command = \"private-tool\"
+"""
+
+        merged = merge_codex_config(existing, {"serena"}, "")
+
+        self.assertNotIn("serena", merged)
+        self.assertIn("[mcp_servers.private]", merged)
 
     def test_codex_merge_is_idempotent_and_removes_legacy_markers(self) -> None:
         baseline = """## Managed by ai-console: lean
@@ -222,20 +251,21 @@ class RepoApplyTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             temporary_root = Path(temporary)
             root = copy_template_tree(temporary_root / "console")
+            enable_test_profiles(root)
             repo = temporary_root / "repo"
             repo.mkdir()
             (repo / ".claude").mkdir()
             legacy_rules = repo / ".claude/rules"
             legacy_rules.symlink_to(root / "rulesets/core/claude/rules")
-            registry, local = make_registry(temporary_root, repo, "semantic")
+            registry, local = make_registry(temporary_root, repo, "work")
 
             apply_repos(root, registry_path=registry, local_path=local)
 
             expected = {
-                repo / ".codex/config.toml": root / "mcp/profiles/semantic/codex.config.toml",
-                repo / ".cursor/mcp.json": root / "mcp/profiles/semantic/cursor.mcp.json",
-                repo / ".mcp.json": root / "mcp/profiles/semantic/claude.mcp.json",
-                repo / "opencode.jsonc": root / "mcp/profiles/semantic/opencode.jsonc",
+                repo / ".codex/config.toml": root / "mcp/profiles/work/codex.config.toml",
+                repo / ".cursor/mcp.json": root / "mcp/profiles/work/cursor.mcp.json",
+                repo / ".mcp.json": root / "mcp/profiles/work/claude.mcp.json",
+                repo / "opencode.jsonc": root / "mcp/profiles/work/opencode.jsonc",
             }
             for destination, source in expected.items():
                 self.assertTrue(destination.is_symlink(), destination)
@@ -246,23 +276,24 @@ class RepoApplyTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             temporary_root = Path(temporary)
             root = copy_template_tree(temporary_root / "console")
+            enable_test_profiles(root)
             repo = temporary_root / "repo"
             repo.mkdir()
             registry, local = make_registry(
-                temporary_root, repo, ["semantic", "browser"]
+                temporary_root, repo, ["work", "ops"]
             )
 
             apply_repos(root, registry_path=registry, local_path=local)
 
             codex_source = (
-                root / "mcp/composed/browser+semantic/codex.config.toml"
+                root / "mcp/composed/ops+work/codex.config.toml"
             )
             self.assertEqual(
                 Path(os.readlink(repo / ".codex/config.toml")), codex_source
             )
             content = codex_source.read_text(encoding="utf-8")
-            self.assertIn("[mcp_servers.chrome-devtools]", content)
-            self.assertIn("[mcp_servers.serena]", content)
+            self.assertIn("[mcp_servers.datadog]", content)
+            self.assertIn("[mcp_servers.atlassian]", content)
 
             for destination in (
                 repo / ".cursor/mcp.json",
@@ -275,10 +306,11 @@ class RepoApplyTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             temporary_root = Path(temporary)
             root = copy_template_tree(temporary_root / "console")
+            enable_test_profiles(root)
             repo = temporary_root / "repo"
             repo.mkdir()
             registry, local = make_registry(
-                temporary_root, repo, ["browser", "semantic"]
+                temporary_root, repo, ["ops", "work"]
             )
 
             runner = apply_repos(
@@ -359,6 +391,20 @@ class GlobalApplyTests(unittest.TestCase):
             )
             self.assertTrue(cursor_config["display"]["showStatusLineRunningTime"])
             self.assertEqual(cursor_config["display"]["mode"], "zen")
+            cursor_mcp = json.loads(
+                (home / ".cursor/mcp.json").read_text(encoding="utf-8")
+            )
+            claude_mcp = json.loads(
+                (home / ".claude.json").read_text(encoding="utf-8")
+            )["mcpServers"]
+            self.assertEqual(
+                set(cursor_mcp["mcpServers"]),
+                {"context7", "chrome-devtools", "datadog", "atlassian", "circleci"},
+            )
+            self.assertTrue(
+                {"context7", "chrome-devtools", "datadog", "atlassian", "circleci"}
+                <= set(claude_mcp)
+            )
             self.assertTrue((home / ".claude/ai-console-statusline.sh").is_symlink())
             self.assertIn(
                 "Bash(git push *)", claude_settings["permissions"]["ask"]
@@ -372,6 +418,63 @@ class GlobalApplyTests(unittest.TestCase):
                 home / ".config/opencode/agents/reviewer.md",
             ):
                 self.assertTrue(client_path.is_symlink(), client_path)
+
+    def test_global_apply_uses_partial_plugin_evidence_and_replaces_managed_cursor_link(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            home = Path(temporary)
+            cursor_mcp = home / ".cursor/mcp.json"
+            cursor_mcp.parent.mkdir(parents=True)
+            cursor_mcp.symlink_to(PROJECT_ROOT / "mcp/cursor.mcp.json")
+
+            cursor_context = (
+                home
+                / ".cursor/plugins/cache/cursor-public/context7/rev/.claude-plugin/plugin.json"
+            )
+            cursor_context.parent.mkdir(parents=True)
+            cursor_context.write_text(
+                json.dumps({"name": "context7-plugin"}), encoding="utf-8"
+            )
+            cursor_devtools = (
+                home
+                / ".cursor/plugins/cache/cursor-public/devtools/rev/.cursor-plugin/plugin.json"
+            )
+            cursor_devtools.parent.mkdir(parents=True)
+            cursor_devtools.write_text(
+                json.dumps({"name": "devtools-for-agents", "version": "1"}),
+                encoding="utf-8",
+            )
+
+            claude_manifest = (
+                home
+                / ".claude/plugins/cache/official/context7/.claude-plugin/plugin.json"
+            )
+            claude_manifest.parent.mkdir(parents=True)
+            claude_manifest.write_text(
+                json.dumps({"name": "context7"}), encoding="utf-8"
+            )
+            claude_settings = home / ".claude/settings.json"
+            claude_settings.write_text(
+                json.dumps({"enabledPlugins": {"context7@official": True}}),
+                encoding="utf-8",
+            )
+
+            apply_global(PROJECT_ROOT, home)
+
+            self.assertFalse(cursor_mcp.is_symlink())
+            cursor_servers = json.loads(cursor_mcp.read_text(encoding="utf-8"))[
+                "mcpServers"
+            ]
+            self.assertEqual(
+                set(cursor_servers), {"datadog", "atlassian", "circleci"}
+            )
+            claude_servers = json.loads(
+                (home / ".claude.json").read_text(encoding="utf-8")
+            )["mcpServers"]
+            self.assertNotIn("context7", claude_servers)
+            self.assertEqual(
+                set(claude_servers),
+                {"chrome-devtools", "datadog", "atlassian", "circleci"},
+            )
 
 
 class BackupRestoreTests(unittest.TestCase):

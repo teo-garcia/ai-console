@@ -7,7 +7,11 @@ import tomllib
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from .capabilities import load_capability_registry, resolve_capabilities
+from .capabilities import (
+    discover_client_plugins,
+    load_capability_registry,
+    resolve_capabilities,
+)
 from .config import ConfigError, ROOT, load_json, load_repo_entries
 from .mcp import (
     PROFILE_FILENAMES,
@@ -15,6 +19,7 @@ from .mcp import (
     expected_outputs,
     profile_config_path,
     render_all,
+    render_global_config,
     render_profile_config,
 )
 from .ops import (
@@ -156,6 +161,16 @@ def verify_templates(root: Path = ROOT) -> Verifier:
 def verify_install(root: Path = ROOT, home: Path | None = None) -> Verifier:
     active_home = home or Path.home()
     result = Verifier()
+
+    def enabled_plugins(client: str) -> set[str]:
+        discovery_client = "codex-cli" if client == "codex" else client
+        discovered = discover_client_plugins(discovery_client, active_home)
+        return {
+            name
+            for name, metadata in discovered.items()
+            if metadata.get("enabled") is True
+        }
+
     expected_links = {
         active_home / ".codex/AGENTS.md": root / "rulesets/core/codex/AGENTS.md",
         active_home / ".claude/CLAUDE.md": root / "rulesets/core/claude/CLAUDE.md",
@@ -166,7 +181,6 @@ def verify_install(root: Path = ROOT, home: Path | None = None) -> Verifier:
         root / "AGENTS.md": root / "rulesets/core/codex/AGENTS.md",
         root / "CLAUDE.md": root / "rulesets/core/claude/CLAUDE.md",
         root / ".cursor/rules": root / "rulesets/core/cursor/rules",
-        active_home / ".cursor/mcp.json": root / "mcp/cursor.mcp.json",
         active_home / ".config/opencode/opencode.jsonc": root / "mcp/opencode.jsonc",
         active_home / ".claude/ai-console-statusline.sh": root
         / "status-lines/claude.sh",
@@ -208,7 +222,9 @@ def verify_install(root: Path = ROOT, home: Path | None = None) -> Verifier:
     try:
         codex_text = codex_config.read_text(encoding="utf-8")
         tomllib.loads(codex_text)
-        baseline = (root / "mcp/codex.config.toml").read_text(encoding="utf-8")
+        baseline = render_global_config(
+            root, "codex", enabled_plugins=enabled_plugins("codex")
+        )
         merged = merge_codex_config(codex_text, _managed_servers(root), baseline)
         status_items = load_json(root / "status-lines/codex.json").get("items")
         if not isinstance(status_items, list):
@@ -223,7 +239,11 @@ def verify_install(root: Path = ROOT, home: Path | None = None) -> Verifier:
     claude_config = active_home / ".claude.json"
     try:
         claude_data = load_json(claude_config)
-        baseline_data = load_json(root / "mcp/claude.mcp.json")
+        baseline_data = json.loads(
+            render_global_config(
+                root, "claude", enabled_plugins=enabled_plugins("claude")
+            )
+        )
         if (
             merge_claude_config(claude_data, _managed_servers(root), baseline_data)
             == claude_data
@@ -231,6 +251,28 @@ def verify_install(root: Path = ROOT, home: Path | None = None) -> Verifier:
             result.ok(f"managed Claude config is current {claude_config}")
         else:
             result.fail(f"managed Claude config has drift {claude_config}")
+    except ConfigError as exc:
+        result.fail(str(exc))
+
+    cursor_mcp_config = active_home / ".cursor/mcp.json"
+    try:
+        cursor_mcp_data = load_json(cursor_mcp_config)
+        cursor_mcp_baseline = json.loads(
+            render_global_config(
+                root, "cursor", enabled_plugins=enabled_plugins("cursor")
+            )
+        )
+        if (
+            merge_claude_config(
+                cursor_mcp_data, _managed_servers(root), cursor_mcp_baseline
+            )
+            == cursor_mcp_data
+        ):
+            result.ok(
+                f"managed Cursor MCP config is current {cursor_mcp_config}"
+            )
+        else:
+            result.fail(f"managed Cursor MCP config has drift {cursor_mcp_config}")
     except ConfigError as exc:
         result.fail(str(exc))
 

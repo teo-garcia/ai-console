@@ -28,3 +28,8 @@ scripts/ai-console eval score evals/runs/<run>.json \
 Use the same client, model, repeat count, and corpus for both variants. Treat
 latency and completion rate as measurements; treat rubric scores as calibrated
 human judgments. Keep the raw run artifact when reporting a comparison.
+
+The completed code-intelligence experiment is historical evidence, not an active
+harness. Its result and retirement decision are recorded in
+`docs/plans/capability-pilot-2026-09-14.md`; the provider-specific executor and
+corpus were removed with the rejected integrations.

@@ -26,6 +26,20 @@ def write_json(path: Path, value: object) -> None:
     path.write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
 
 
+def enable_test_profiles(root: Path) -> None:
+    """Add fixture-only profiles so generic scoped-override behavior stays tested."""
+    canonical_path = root / "mcp/canonical.json"
+    canonical = json.loads(canonical_path.read_text(encoding="utf-8"))
+    canonical["profiles"] = {
+        "ops": {"servers": ["datadog"]},
+        "work": {"servers": ["atlassian"]},
+    }
+    write_json(canonical_path, canonical)
+    from ai_console.mcp import render_all
+
+    render_all(root)
+
+
 def make_registry(
     root: Path, repo: Path, profiles: str | list[str] = "lean"
 ) -> tuple[Path, Path]:

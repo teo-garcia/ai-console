@@ -15,6 +15,15 @@
       "activation": "global",
       "implementations": [
         {
+          "id": "claude-context7-plugin",
+          "kind": "plugin",
+          "clients": ["claude"],
+          "pluginName": "context7",
+          "supersedesMcp": "context7",
+          "approval": "auto",
+          "useWhen": "Claude can use the official user-scoped Context7 plugin instead of a duplicate standalone MCP entry"
+        },
+        {
           "id": "cursor-context7-plugin",
           "kind": "plugin",
           "clients": ["cursor"],
@@ -100,6 +109,24 @@
           "useWhen": "Interactive local-page testing, screenshots, clicking, typing, or rendered-state verification"
         },
         {
+          "id": "claude-chrome-devtools-plugin",
+          "kind": "plugin",
+          "clients": ["claude"],
+          "pluginName": "chrome-devtools-mcp",
+          "supersedesMcp": "chrome-devtools",
+          "approval": "writes",
+          "useWhen": "Claude needs the Google-maintained Chrome DevTools MCP plus its focused debugging skills"
+        },
+        {
+          "id": "cursor-chrome-devtools-plugin",
+          "kind": "plugin",
+          "clients": ["cursor"],
+          "pluginName": "devtools-for-agents",
+          "supersedesMcp": "chrome-devtools",
+          "approval": "writes",
+          "useWhen": "Cursor can use the Google Chrome marketplace plugin's debugging skills and bundled MCP"
+        },
+        {
           "id": "chrome-devtools",
           "kind": "mcp",
           "clients": [
@@ -111,7 +138,6 @@
             "opencode"
           ],
           "mcpServer": "chrome-devtools",
-          "profile": "browser",
           "approval": "writes",
           "useWhen": "CLI or IDE work needs DOM, console, network, CDP, or performance diagnostics"
         }
@@ -176,22 +202,6 @@
           "command": "rg",
           "approval": "auto",
           "useWhen": "Fast text, filename, caller, or configuration discovery"
-        },
-        {
-          "id": "serena",
-          "kind": "mcp",
-          "clients": [
-            "codex-desktop",
-            "codex-cli",
-            "codex-ide",
-            "claude",
-            "cursor",
-            "opencode"
-          ],
-          "mcpServer": "serena",
-          "profile": "semantic",
-          "approval": "writes",
-          "useWhen": "Symbol-aware navigation or refactoring is materially safer than text search"
         }
       ]
     },
@@ -396,26 +406,10 @@
       ]
     },
     "architecture-analysis": {
-      "description": "Build an indexed structural and impact model of a codebase",
+      "description": "Trace structure, dependencies, and impact without maintaining a second code index",
       "risk": "read-only",
       "activation": "on-demand",
       "implementations": [
-        {
-          "id": "codebase-memory",
-          "kind": "mcp",
-          "clients": [
-            "codex-desktop",
-            "codex-cli",
-            "codex-ide",
-            "claude",
-            "cursor",
-            "opencode"
-          ],
-          "mcpServer": "codebase-memory",
-          "profile": "codebase",
-          "approval": "writes",
-          "useWhen": "A large unfamiliar repository needs persistent structure or impact analysis"
-        },
         {
           "id": "ripgrep",
           "kind": "cli",
@@ -429,18 +423,18 @@
           ],
           "command": "rg",
           "approval": "auto",
-          "useWhen": "A bounded source trace can answer the question without maintaining an index"
+          "useWhen": "Source, tests, manifests, and call sites can establish the architecture from primary evidence"
         }
       ]
     },
-    "durable-memory": {
-      "description": "Reviewable cross-client project knowledge",
-      "risk": "write",
+    "database-inspection": {
+      "description": "Inspect a specifically authorized PostgreSQL target",
+      "risk": "external-write",
       "activation": "on-demand",
       "implementations": [
         {
-          "id": "basic-memory",
-          "kind": "mcp",
+          "id": "psql-cli",
+          "kind": "cli",
           "clients": [
             "codex-desktop",
             "codex-cli",
@@ -449,10 +443,10 @@
             "cursor",
             "opencode"
           ],
-          "mcpServer": "basic-memory",
-          "profile": "memory",
-          "approval": "writes",
-          "useWhen": "Long-running work benefits from explicit Markdown knowledge that humans can review"
+          "command": "psql",
+          "auth": "cli-session",
+          "approval": "prompt",
+          "useWhen": "The user has named the database target and supplied a least-privilege connection through local environment or service configuration"
         }
       ]
     },
@@ -470,6 +464,7 @@
           "supersedesMcp": "datadog",
           "auth": "oauth",
           "approval": "prompt",
+          "requires": "Codex account administrator enables the curated Datadog plugin",
           "useWhen": "Codex can lazily use the curated Datadog connector instead of preloading a standalone MCP"
         },
         {
@@ -504,7 +499,6 @@
             "opencode"
           ],
           "mcpServer": "datadog",
-          "profile": "ops",
           "auth": "oauth",
           "approval": "prompt",
           "useWhen": "An authorized incident or operational question requires Datadog evidence"
@@ -556,6 +550,156 @@
           "command": "git",
           "approval": "writes",
           "useWhen": "The task concerns only the local repository or ordinary Git transport"
+        }
+      ]
+    },
+    "work-tracking": {
+      "description": "Search and update Jira, Confluence, Compass, and Atlassian work context",
+      "risk": "external-write",
+      "activation": "on-demand",
+      "implementations": [
+        {
+          "id": "claude-atlassian-plugin",
+          "kind": "plugin",
+          "clients": ["claude"],
+          "pluginName": "atlassian",
+          "supersedesMcp": "atlassian",
+          "auth": "oauth",
+          "approval": "prompt",
+          "useWhen": "Claude can use Atlassian's official plugin and its Jira and Confluence workflow skills"
+        },
+        {
+          "id": "cursor-atlassian-plugin",
+          "kind": "plugin",
+          "clients": ["cursor"],
+          "pluginName": "atlassian",
+          "supersedesMcp": "atlassian",
+          "auth": "oauth",
+          "approval": "prompt",
+          "useWhen": "Cursor can use the verified Atlassian plugin and its triage, backlog, search, and reporting skills"
+        },
+        {
+          "id": "claude-atlassian-connector",
+          "kind": "native",
+          "clients": ["claude"],
+          "auth": "connector",
+          "approval": "prompt",
+          "requires": "Claude.ai Atlassian connector authentication",
+          "useWhen": "Claude already exposes the account-level Atlassian connector and it is authenticated"
+        },
+        {
+          "id": "atlassian",
+          "kind": "mcp",
+          "clients": [
+            "codex-desktop",
+            "codex-cli",
+            "codex-ide",
+            "claude",
+            "cursor",
+            "opencode"
+          ],
+          "mcpServer": "atlassian",
+          "auth": "oauth",
+          "approval": "prompt",
+          "useWhen": "An authorized task needs Atlassian records or must change Jira or Confluence state"
+        }
+      ]
+    },
+    "continuous-integration": {
+      "description": "Inspect CircleCI runs, logs, tests, artifacts, and authorized workflow actions",
+      "risk": "external-write",
+      "activation": "on-demand",
+      "implementations": [
+        {
+          "id": "codex-circleci-plugin",
+          "kind": "plugin",
+          "clients": ["codex-desktop", "codex-cli"],
+          "pluginName": "circleci",
+          "selector": "@CircleCI",
+          "supersedesMcp": "circleci",
+          "auth": "oauth",
+          "approval": "prompt",
+          "requires": "Codex account administrator enables the curated CircleCI plugin",
+          "useWhen": "Codex Desktop or CLI can lazily use the curated CircleCI plugin"
+        },
+        {
+          "id": "cursor-circleci-plugin",
+          "kind": "plugin",
+          "clients": ["cursor"],
+          "pluginName": "circleci",
+          "supersedesMcp": "circleci",
+          "auth": "oauth",
+          "approval": "prompt",
+          "useWhen": "Cursor can use its official CircleCI marketplace package instead of a duplicate standalone MCP"
+        },
+        {
+          "id": "circleci",
+          "kind": "mcp",
+          "clients": [
+            "codex-desktop",
+            "codex-cli",
+            "codex-ide",
+            "claude",
+            "cursor",
+            "opencode"
+          ],
+          "mcpServer": "circleci",
+          "auth": "oauth",
+          "approval": "prompt",
+          "useWhen": "An authorized task needs CircleCI run evidence or must rerun or cancel a workflow"
+        },
+        {
+          "id": "circleci-cli",
+          "kind": "cli",
+          "clients": [
+            "codex-desktop",
+            "codex-cli",
+            "codex-ide",
+            "claude",
+            "cursor",
+            "opencode"
+          ],
+          "command": "circleci",
+          "auth": "cli-session",
+          "approval": "prompt",
+          "useWhen": "CircleCI configuration authoring or administration needs the broader installed CLI surface"
+        }
+      ]
+    },
+    "terminal-orchestration": {
+      "description": "Coordinate persistent terminal workspaces, panes, agents, and worktrees",
+      "risk": "write",
+      "activation": "on-demand",
+      "implementations": [
+        {
+          "id": "herdr-cli",
+          "kind": "cli",
+          "clients": [
+            "codex-desktop",
+            "codex-cli",
+            "codex-ide",
+            "claude",
+            "cursor",
+            "opencode"
+          ],
+          "command": "herdr",
+          "approval": "writes",
+          "useWhen": "Coordinated panes, persistent agent sessions, worktrees, or terminal handoffs materially improve the workflow"
+        }
+      ]
+    },
+    "terminal-session-state": {
+      "description": "Report an OpenCode session's working, blocked, and idle state to its owning Herdr pane",
+      "risk": "write",
+      "activation": "global",
+      "implementations": [
+        {
+          "id": "opencode-herdr-agent-state",
+          "kind": "plugin",
+          "clients": ["opencode"],
+          "pluginName": "herdr-agent-state",
+          "approval": "writes",
+          "useWhen": "OpenCode is launched inside Herdr and should keep the pane's agent state synchronized without repository files"
         }
       ]
     },
