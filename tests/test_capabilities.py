@@ -315,6 +315,56 @@ class CapabilityResolutionTests(unittest.TestCase):
                 {"not-installed"},
             )
 
+            desktop = next(
+                item
+                for item in claude["capabilities"]
+                if item["name"] == "desktop-control"
+            )
+            self.assertIsNone(desktop["preferred"])
+            self.assertEqual(desktop["previewPreferred"], "claude-computer-use")
+            self.assertEqual(
+                desktop["implementations"][0]["state"], "available-on-demand"
+            )
+            self.assertIs(desktop["implementations"][0]["enabled"], False)
+            self.assertEqual(desktop["implementations"][0]["selector"], "/mcp")
+
+    @patch("ai_console.capabilities.shutil.which")
+    def test_cli_browser_and_computer_use_fallbacks_are_global_not_profile_bound(
+        self, which: MagicMock
+    ) -> None:
+        available_commands = {
+            "/bin/sh",
+            "browser-control",
+            "herdr",
+            "npx",
+            "open-computer-use",
+            "rg",
+        }
+        which.side_effect = lambda command: (
+            command if command.startswith("/") else f"/usr/bin/{command}"
+        ) if command in available_commands else None
+
+        for client in ("cursor", "opencode"):
+            with self.subTest(client=client):
+                payload = resolve_capabilities(client=client, home=Path("/nonexistent"))
+                by_name = {
+                    item["name"]: item for item in payload["capabilities"]
+                }
+
+                self.assertEqual(payload["profiles"], [])
+                self.assertEqual(payload["previewProfiles"], [])
+                self.assertEqual(
+                    by_name["signed-in-browser"]["preferred"],
+                    "browser-control-cli",
+                )
+                self.assertEqual(
+                    by_name["desktop-control"]["preferred"],
+                    "open-computer-use-cli",
+                )
+                self.assertEqual(
+                    by_name["browser-testing"]["preferred"], "chrome-devtools"
+                )
+
     def test_precedence_is_native_then_plugin_then_mcp_then_cli(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = copy_template_tree(Path(temporary) / "root")

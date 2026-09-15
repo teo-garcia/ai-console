@@ -177,9 +177,6 @@ def verify_install(root: Path = ROOT, home: Path | None = None) -> Verifier:
         active_home / ".claude/commands": root / "skills/claude",
         active_home / ".config/opencode/AGENTS.md": root
         / "rulesets/core/opencode/AGENTS.md",
-        active_home / "AGENTS.md": root / "rulesets/core/opencode/AGENTS.md",
-        root / "AGENTS.md": root / "rulesets/core/codex/AGENTS.md",
-        root / "CLAUDE.md": root / "rulesets/core/claude/CLAUDE.md",
         root / ".cursor/rules": root / "rulesets/core/cursor/rules",
         active_home / ".config/opencode/opencode.jsonc": root / "mcp/opencode.jsonc",
         active_home / ".claude/ai-console-statusline.sh": root
@@ -337,21 +334,37 @@ def verify_install(root: Path = ROOT, home: Path | None = None) -> Verifier:
         if not repo.is_dir():
             result.warn(f"registered repo is unavailable {entry.name} -> {repo}")
             continue
-        rule_links = {
-            repo / repo_targets["codex"]["rules"]: root
-            / f"rulesets/{entry.ruleset}/codex/AGENTS.md",
-            repo / repo_targets["cursor"]["rules"]: root
-            / f"rulesets/{entry.ruleset}/cursor/rules",
-            repo / repo_targets["claude"]["rules"]: root
-            / f"rulesets/{entry.ruleset}/claude/CLAUDE.md",
+        cursor_rule = repo / repo_targets["cursor"]["rules"]
+        expected_cursor_rule = root / f"rulesets/{entry.ruleset}/cursor/rules"
+        if (
+            cursor_rule.is_symlink()
+            and Path(cursor_rule.readlink()) == expected_cursor_rule
+            and cursor_rule.exists()
+        ):
+            result.ok(f"repo Cursor rule installed {cursor_rule}")
+        elif cursor_rule.exists():
+            result.warn(f"repo Cursor rule is user-owned and was preserved {cursor_rule}")
+        else:
+            result.fail(f"repo Cursor rule missing {cursor_rule}")
+
+        global_clients = {
+            repo / repo_targets["codex"]["rules"],
+            repo / repo_targets["claude"]["rules"],
+            repo / repo_targets["opencode"]["rules"],
         }
-        for path, expected in rule_links.items():
-            if path.is_symlink() and Path(path.readlink()) == expected and path.exists():
-                result.ok(f"repo rule installed {path}")
-            elif path.exists():
-                result.warn(f"repo rule is user-owned and was preserved {path}")
+        for path in global_clients:
+            if path.is_symlink():
+                try:
+                    Path(path.readlink()).relative_to(root / "rulesets")
+                except ValueError:
+                    pass
+                else:
+                    result.fail(f"duplicate managed repo rule remains {path}")
+                    continue
+            if path.exists():
+                result.ok(f"repo instruction is project-owned {path}")
             else:
-                result.fail(f"repo rule missing {path}")
+                result.ok(f"repo uses global instructions {path}")
         legacy_claude_rules = repo / ".claude/rules"
         if legacy_claude_rules.is_symlink():
             try:

@@ -362,7 +362,11 @@ def apply_global(
     runner.link(
         root / "rulesets/core/opencode/AGENTS.md", target("opencode", "instructions")
     )
-    runner.link(root / "rulesets/core/opencode/AGENTS.md", active_home / "AGENTS.md")
+    _unlink_exact_link(
+        runner,
+        active_home / "AGENTS.md",
+        root / "rulesets/core/opencode/AGENTS.md",
+    )
 
     for client_dir, skills_dir in (
         (root / "skills/codex", codex_skills),
@@ -545,14 +549,13 @@ def apply_repos(
             continue
         codex_rules = target("codex", "rules")
         opencode_rules = target("opencode", "rules")
-        runner.link(root / f"rulesets/{entry.ruleset}/codex/AGENTS.md", repo / codex_rules)
+        _unlink_managed_link(runner, repo / codex_rules, root / "rulesets")
         runner.link(
             root / f"rulesets/{entry.ruleset}/cursor/rules",
             repo / target("cursor", "rules"),
         )
-        runner.link(
-            root / f"rulesets/{entry.ruleset}/claude/CLAUDE.md",
-            repo / target("claude", "rules"),
+        _unlink_managed_link(
+            runner, repo / target("claude", "rules"), root / "rulesets"
         )
         _unlink_managed_link(
             runner,
@@ -560,12 +563,11 @@ def apply_repos(
             root / f"rulesets/{entry.ruleset}/claude/rules",
         )
         if opencode_rules == codex_rules:
-            runner.emit(f"shared: {repo / codex_rules} is used by Codex and OpenCode")
-        else:
-            runner.link(
-                root / f"rulesets/{entry.ruleset}/opencode/AGENTS.md",
-                repo / opencode_rules,
+            runner.emit(
+                f"global: {repo / codex_rules} is reserved for project-owned instructions"
             )
+        else:
+            _unlink_managed_link(runner, repo / opencode_rules, root / "rulesets")
 
         _unlink_managed_mcp(runner, root, repo / "mcp.json")
         for client in PROFILE_FILENAMES:

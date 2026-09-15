@@ -73,11 +73,24 @@ Edit `rulesets/core/source.md`, then run `scripts/render`. The renderer produces
 - `rulesets/core/cursor/rules/core.mdc`, including required Cursor metadata
 - `rulesets/core/opencode/AGENTS.md`
 
-The core contains universal trust, scope, safety, evidence, and verification
-policy plus two operational defaults: stay in the active workspace and prefer
-native client tools. The `engineering-workflows` skill is reserved for
-incidents, complex migrations, consequential architecture decisions, or an
-explicit playbook request. Routine coding work should not load it.
+The core is a concise global behavioral baseline: independent judgment without
+sycophancy or reflexive disagreement, scoped action, evidence, safety,
+verification, and honest reporting. Client tool routing lives in
+`config/capabilities.json`; conditional procedures live in skills; mechanically
+enforceable behavior lives in settings, hooks, and tests.
+
+`apply-global` installs the core once at each client's documented user-level
+instruction path for Codex, Claude Code, and OpenCode. Cursor exposes global
+User Rules through its settings but no supported import path in Cursor Agent
+CLI, so `apply-repos` keeps one `.cursor/rules` overlay per registered repository.
+It removes legacy ai-console links at repository `AGENTS.md` and `CLAUDE.md`
+paths, preventing clients from loading the same global core twice, while
+preserving project-owned instruction files. Project files should contain only
+concrete repository facts, commands, architecture, and non-obvious constraints.
+
+The `engineering-workflows` skill is reserved for incidents, complex
+migrations, consequential architecture decisions, or an explicit playbook
+request. Routine coding work should not load it.
 
 Globally linked general-purpose skills:
 
@@ -117,7 +130,7 @@ The selected baseline is client-specific and user-scoped:
 | --- | --- | --- |
 | Codex | Runtime Browser, Chrome, Computer Use; curated GitHub | Lazy bundles supplied by Codex; Datadog and CircleCI fall back to MCP because the account administrator blocks their curated plugins |
 | Claude Code | `typescript-lsp`, Context7, Chrome DevTools, Datadog, Atlassian | Official user-scope plugins replace four duplicate standalone MCP registrations and add focused skills where available |
-| Cursor | Context7 installed; Chrome Devtools for Agents, Datadog, Atlassian, CircleCI selected | Context7 replaces its MCP now; the four reviewed marketplace packages remain optional because working MCP fallbacks are already global |
+| Cursor CLI | Context7 installed; Chrome Devtools for Agents, Datadog, Atlassian, CircleCI selected | Context7 replaces its MCP now; the four reviewed marketplace packages remain manual optional installs because working MCP fallbacks are already global |
 | OpenCode | `opencode-goal-plugin@0.8.2`; Herdr state reporter | No verified ecosystem plugin replaces these five MCPs; Herdr reports pane state without repository files |
 
 Claude's installed plugins own Context7, Chrome DevTools, Datadog, and Atlassian,
@@ -134,13 +147,22 @@ config: Desktop/CLI prefer native or installed plugins, and the IDE retains
 working fallbacks. Curated Datadog and CircleCI plugins exist in the catalog but
 are disabled by this account's administrator.
 
+Browser and desktop control follow the same outcome-oriented routing. Codex uses
+its lazy Browser, Chrome, and Computer Use bundles. Claude Code exposes Claude in
+Chrome and a built-in `computer-use` MCP, but Anthropic requires the user to
+enable those client-owned capabilities. Cursor CLI and OpenCode retain the
+global Chrome DevTools MCP for browser diagnostics; the resolver also recognizes
+the optional global `browser-control` and `open-computer-use` executables when
+installed. Ai-console does not silently install browser extensions or grant
+screen and accessibility permissions.
+
 The cross-client goal contract is:
 
 | Client | Implementation |
 | --- | --- |
 | Codex | Native `/goal`; the stable `goals` feature remains enabled |
 | Claude Code | Native `/goal` with its session-scoped evaluator |
-| Cursor Agent | Native `/goal`; `/loop` remains available for scheduled check-ins |
+| Cursor Agent CLI | Native `/goal`; `/loop` remains available for scheduled check-ins |
 | OpenCode | Pinned `opencode-goal-plugin@0.8.2` and a native-looking `/goal` command |
 
 OpenCode normally persists this plugin under `.opencode/goals`. The managed
@@ -177,8 +199,8 @@ Inspect what a client can use now:
 
 ```sh
 scripts/ai-console capabilities --client codex-desktop
-scripts/ai-console capabilities --client codex-cli --repo ai-console
-scripts/ai-console doctor --client codex-cli --repo ai-console
+scripts/ai-console capabilities --client codex-cli
+scripts/ai-console doctor --client codex-cli
 ```
 
 Ask for the outcome directly: “test the login flow” or “trace this symbol.” The
@@ -186,6 +208,11 @@ rules tell each client to prefer its native capability or installed plugin, then
 the globally configured MCP fallback. No profile name is required. Explicit
 selectors are optional overrides. `doctor --live` adds bounded TCP reachability
 checks; normal doctor and CI remain network-free.
+
+The shipped capability baseline is global and `mcp/canonical.json` defines no
+profiles. Repository registration binds paths and rules; every tracked
+`mcpProfiles` list is empty. The dormant profile parser is compatibility
+infrastructure, not part of the active setup.
 
 The resolver reports configuration separately from authentication, reachability,
 and current-session activation. It never installs or invokes a tool. Serena and
@@ -195,10 +222,11 @@ result. The measured decision is preserved in
 `docs/plans/capability-pilot-2026-09-14.md`.
 
 The inventory is outcome-oriented and preserves each client's native path:
-Claude web and optional LSP plugins, Cursor code intelligence and built-in review,
-OpenCode web/custom tools and in-process plugins, and Codex plugin bundles and
-connectors. Skills and subagents are represented as lazy native capabilities;
-worktree isolation remains task-specific rather than a global default.
+Claude web and optional LSP/browser/Computer Use integrations, Cursor CLI code
+intelligence and built-in review, OpenCode web/custom tools and in-process
+plugins, and Codex plugin bundles and connectors. Skills and subagents are
+represented as lazy native capabilities; worktree isolation remains
+task-specific rather than a global default.
 
 Plugin discovery is local and client-specific. Codex manifests, Claude plugin
 settings/manifests, Cursor Plugin and Agent Plugin manifests, and OpenCode file or
@@ -288,8 +316,8 @@ Client implementations intentionally differ:
 | --- | --- |
 | Codex | `codex plugin add`, `/plugins`, `--search`, Browser/Chrome/Computer Use plugins, and built-in subagents |
 | Claude Code | Web tools, `--chrome`, `/agents`, official marketplace plugins, and classifier-backed `auto` permissions |
-| Cursor Agent | Built-in code/web tools, Customize or IDE `/add-plugin`, `--auto-review`, optional sandbox, and explicit `--worktree` |
-| OpenCode | Built-in web/LSP/skills/agents and `opencode plugin <module>`; there is no `/plugin` slash command |
+| Cursor Agent CLI | Built-in code/web tools, `agent plugin`, `--plugin-dir`, `--auto-review`, optional sandbox, and explicit `--worktree` |
+| OpenCode | Built-in web/LSP/skills/agents, `opencode plugin <module>`, and optional Browser Control/Open Computer Use CLI fallbacks; there is no `/plugin` slash command |
 
 ## Status lines
 
@@ -440,9 +468,13 @@ Relevant native references:
 - [Claude Code hooks](https://code.claude.com/docs/en/hooks)
 - [Claude Code subagents](https://code.claude.com/docs/en/sub-agents)
 - [Claude Code permissions](https://code.claude.com/docs/en/permissions)
-- [Cursor Agent permissions](https://docs.cursor.com/cli/reference/permissions)
+- [Claude Code with Chrome](https://code.claude.com/docs/en/chrome)
+- [Claude Code Computer Use](https://code.claude.com/docs/en/computer-use)
+- [Cursor Agent CLI permissions](https://docs.cursor.com/cli/reference/permissions)
 - [OpenCode plugins](https://opencode.ai/docs/plugins/)
 - [OpenCode agents](https://opencode.ai/docs/agents)
+- [Browser Control](https://github.com/anomalyco/browser-control)
+- [Open Computer Use](https://github.com/anomalyco/computer-use)
 
 ## Repository layout
 

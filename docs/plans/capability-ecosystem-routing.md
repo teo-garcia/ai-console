@@ -8,8 +8,8 @@ Branch: `plan/capability-ecosystem-routing`
 ## Outcome
 
 AI-console standardizes outcomes and safety policy across Codex Desktop/CLI/IDE,
-Claude Code, Cursor Agent, and OpenCode without pretending the clients expose the
-same product surface.
+Claude Code, Cursor Agent CLI, and OpenCode without pretending the clients expose
+the same product surface.
 
 The routing order is:
 
@@ -17,6 +17,29 @@ The routing order is:
 2. otherwise use an installed, useful plugin;
 3. otherwise use the globally configured MCP integration;
 4. otherwise use a narrow installed CLI.
+
+The registry is global. It does not select capability or MCP profiles per
+repository; the tracked repository entries keep `mcpProfiles: []`. A client may
+still impose its own consent boundary, such as enabling Claude Code's built-in
+Computer Use server in an interactive project session or loading a browser
+extension manually. Those client-owned choices are reported as prerequisites,
+not modeled as ai-console profiles.
+
+```mermaid
+flowchart LR
+    task[Requested outcome] --> research[Public research]
+    task --> test[Browser testing]
+    task --> signed[Signed-in browser]
+    task --> desktop[Desktop control]
+
+    research --> web[Client-native web]
+    test --> browser[Native or installed browser tool]
+    test --> cdp[Global Chrome DevTools MCP]
+    signed --> chrome[Codex Chrome or Claude in Chrome]
+    signed --> bc[Browser Control CLI for Cursor/OpenCode]
+    desktop --> cu[Codex or Claude Computer Use]
+    desktop --> ocu[Open Computer Use CLI for Cursor/OpenCode]
+```
 
 The selected integrations are globally configured so they are immediately
 discoverable in every client. Clients still invoke them only for relevant tasks,
@@ -30,6 +53,8 @@ outcomes; they do not need to know provider or profile names.
 | Current library docs | installed Claude/Cursor Context7 plugins | Context7 MCP, then public web | global, lightweight |
 | Public research | each client's native web/search | Codex Browser plugin where present | lazy |
 | Browser testing | Codex Browser/Chrome; installed client plugins | Chrome DevTools MCP | globally configured; invoked on demand |
+| Signed-in browser | Codex Chrome; Claude in Chrome | Browser Control CLI for Cursor CLI/OpenCode | client or extension consent on first use |
+| Desktop control | Codex Computer Use; Claude built-in Computer Use | Open Computer Use CLI for Cursor CLI/OpenCode | client/OS consent on first use |
 | Code navigation | Cursor/Claude/OpenCode native code and LSP tools | `rg` and ordinary client file tools | on demand |
 | GitHub | Codex GitHub plugin | authenticated `gh`, then `git` | immediately available |
 | Jira/Confluence/Compass | native connector or installed client plugin | Atlassian Rovo MCP | globally configured; OAuth on first use |
@@ -49,9 +74,9 @@ for them, normally through Context7 or current official documentation.
 | Client | Native/plugin strengths retained | MCP behavior |
 | --- | --- | --- |
 | Codex | Browser, Chrome, Computer Use, GitHub, skills, subagents, `/goal` | all five MCPs retained because the shared config also serves the plugin-less IDE; curated Datadog/CircleCI plugins are admin-disabled |
-| Claude Code | web, Chrome, file/search tools, agents, five selected official plugins, `/goal` | CircleCI MCP only; Context7, Chrome DevTools, Datadog, and Atlassian are plugin-owned |
-| Cursor Agent | built-in code/web/review, installed Context7 plugin, agents/worktrees | Context7 is plugin-owned; Chrome DevTools, Datadog, Atlassian, and CircleCI remain MCP fallbacks until their optional plugins are installed |
-| OpenCode | web, optional LSP, skills, agents, custom tools, Herdr state plugin | all five MCPs retained because no verified ecosystem replacement exists |
+| Claude Code | web, opt-in Claude in Chrome, opt-in built-in Computer Use, file/search tools, agents, five selected official plugins, `/goal` | CircleCI MCP only; Context7, Chrome DevTools, Datadog, and Atlassian are plugin-owned |
+| Cursor Agent CLI | built-in code/web/review, installed Context7 plugin, agents/worktrees | Context7 is plugin-owned; Chrome DevTools, Datadog, Atlassian, and CircleCI remain MCP fallbacks; Browser Control and Open Computer Use are optional installed CLIs |
+| OpenCode | web, optional LSP, skills, agents, custom tools, Herdr state plugin | all five MCPs retained; Browser Control and Open Computer Use are optional installed CLIs rather than baseline plugins |
 
 Plugin-first means a verified package owns the integration when that client can
 actually install it. A package may add skills, agents, hooks, or client-native
@@ -61,6 +86,19 @@ package, an administrator blocks it, or another surface sharing the same config
 cannot load plugins. Tracked templates always retain the complete fallback set;
 global apply suppresses a duplicate only from local evidence that its owner is
 enabled. A fresh computer therefore works before any optional plugin install.
+
+Claude Code's `computer-use` is a special built-in MCP rather than a configured
+external server. Anthropic keeps it disabled until the user enables it through
+`/mcp`; that choice persists in Claude's project state. Ai-console exposes the
+capability and prerequisite globally but does not synthesize per-repository
+state or bypass the client and operating-system approval flow.
+
+Browser Control and Open Computer Use follow the same fallback rule as other
+tools but are not silently installed. The capability resolver detects their
+global executables when present. Browser Control additionally requires its skill
+and manually loaded Chromium extension; both tools can reach authenticated or
+desktop state, so their extension and OS permission steps remain explicit trust
+boundaries.
 
 ## Skills
 
@@ -233,6 +271,19 @@ manual boundaries.
 - a second global apply made no changes, proving idempotence; the pre-apply
   snapshot is `backups/20260914-155333-006190`.
 
+### Routing follow-up verified on 2026-09-15
+
+- all 66 automated tests passed; render drift and template verification passed;
+- the capability reports keep `profiles` and `previewProfiles` empty for Claude,
+  Cursor CLI, and OpenCode;
+- Claude reports built-in Computer Use as available on demand through `/mcp`,
+  without claiming that the client or OS permission is enabled;
+- Cursor CLI and OpenCode continue to prefer the configured Chrome DevTools MCP
+  for browser testing, while the absent Browser Control and Open Computer Use
+  executables remain visible but inactive fallbacks;
+- no global client configuration, browser extension, or OS permission was
+  changed during this registry-only follow-up.
+
 ## Official documentation checked
 
 - Codex MCP and plugins: <https://learn.chatgpt.com/docs/extend/mcp?surface=cli>,
@@ -241,7 +292,8 @@ manual boundaries.
   <https://code.claude.com/docs/en/mcp>,
   <https://code.claude.com/docs/en/discover-plugins>,
   <https://code.claude.com/docs/en/features-overview>,
-  <https://code.claude.com/docs/en/chrome>
+  <https://code.claude.com/docs/en/chrome>,
+  <https://code.claude.com/docs/en/computer-use>
 - Cursor plugins, marketplace security, and selected packages:
   <https://prod.cursor.com/docs/plugins>,
   <https://prod.cursor.com/help/security-and-privacy/marketplace-security>,
@@ -255,6 +307,9 @@ manual boundaries.
   <https://dev.opencode.ai/docs/plugins/>,
   <https://dev.opencode.ai/docs/ecosystem/>,
   <https://dev.opencode.ai/docs/tools/>
+- OpenCode ecosystem browser and desktop-control fallbacks:
+  <https://github.com/anomalyco/browser-control>,
+  <https://github.com/anomalyco/computer-use>
 - Atlassian Rovo MCP: <https://support.atlassian.com/atlassian-ai-gateway/docs/get-started-with-the-atlassian-remote-mcp-server/>
 - CircleCI MCP: <https://circleci.com/docs/guides/toolkit/circleci-mcp-overview/>
 - GitHub MCP host authentication and client guides:

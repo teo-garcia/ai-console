@@ -150,8 +150,9 @@ class McpRenderingTests(unittest.TestCase):
             content for path, content in outputs.items() if path.name == "AGENTS.md"
         )
 
-        self.assertLess(len(source.splitlines()), 130)
-        self.assertIn("immediately available", source)
+        self.assertLess(len(source.splitlines()), 60)
+        self.assertIn("Do not agree merely to be agreeable", source)
+        self.assertIn("Do not manufacture objections", source)
         cursor = next(content for path, content in outputs.items() if path.suffix == ".mdc")
         self.assertTrue(cursor.startswith("---\n"))
         self.assertIn("alwaysApply: true", cursor)

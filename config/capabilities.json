@@ -140,6 +140,16 @@
           "mcpServer": "chrome-devtools",
           "approval": "writes",
           "useWhen": "CLI or IDE work needs DOM, console, network, CDP, or performance diagnostics"
+        },
+        {
+          "id": "browser-control-cli",
+          "kind": "cli",
+          "clients": ["cursor", "opencode"],
+          "command": "browser-control",
+          "auth": "user-session",
+          "approval": "prompt",
+          "requires": "global Browser Control package and skill plus its manually loaded Chromium extension",
+          "useWhen": "A CLI agent needs deterministic Playwright control of a visible browser or Chrome DevTools is insufficient"
         }
       ]
     },
@@ -166,6 +176,16 @@
           "approval": "prompt",
           "requires": "Claude in Chrome connection",
           "useWhen": "Claude needs the user's signed-in Chrome state rather than public web retrieval"
+        },
+        {
+          "id": "browser-control-cli",
+          "kind": "cli",
+          "clients": ["cursor", "opencode"],
+          "command": "browser-control",
+          "auth": "user-session",
+          "approval": "prompt",
+          "requires": "global Browser Control package and skill plus its manually loaded Chromium extension",
+          "useWhen": "Cursor CLI or OpenCode must continue a workflow in an explicitly attached signed-in browser tab"
         }
       ]
     },
@@ -714,7 +734,7 @@
       ]
     },
     "desktop-control": {
-      "description": "Operate local macOS applications through visible UI",
+      "description": "Operate local desktop applications through visible UI",
       "risk": "external-write",
       "activation": "lazy",
       "implementations": [
@@ -727,6 +747,26 @@
           "auth": "os-permission",
           "approval": "prompt",
           "useWhen": "No purpose-built connector, API, or CLI can operate the required Mac application"
+        },
+        {
+          "id": "claude-computer-use",
+          "kind": "native",
+          "clients": ["claude"],
+          "selector": "/mcp",
+          "auth": "os-permission",
+          "approval": "prompt",
+          "requires": "the built-in computer-use MCP enabled by the user in an interactive Claude Code project session",
+          "useWhen": "Claude Code on macOS must operate a native app and no connector, browser integration, or CLI can do the work"
+        },
+        {
+          "id": "open-computer-use-cli",
+          "kind": "cli",
+          "clients": ["cursor", "opencode"],
+          "command": "open-computer-use",
+          "auth": "os-permission",
+          "approval": "prompt",
+          "requires": "global Open Computer Use installation and operating-system screen and accessibility permissions where required",
+          "useWhen": "Cursor CLI or OpenCode must operate a native application and no purpose-built API or CLI is available"
         }
       ]
     }

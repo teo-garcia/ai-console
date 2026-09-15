@@ -247,6 +247,45 @@ url = \"stale\"
 
 
 class RepoApplyTests(unittest.TestCase):
+    def test_global_core_is_not_duplicated_in_repo_instructions(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            temporary_root = Path(temporary)
+            root = copy_template_tree(temporary_root / "console")
+            repo = temporary_root / "repo"
+            repo.mkdir()
+            (repo / "AGENTS.md").symlink_to(
+                root / "rulesets/core/codex/AGENTS.md"
+            )
+            (repo / "CLAUDE.md").symlink_to(
+                root / "rulesets/core/claude/CLAUDE.md"
+            )
+            registry, local = make_registry(temporary_root, repo, [])
+
+            apply_repos(root, registry_path=registry, local_path=local)
+
+            self.assertFalse((repo / "AGENTS.md").exists())
+            self.assertFalse((repo / "CLAUDE.md").exists())
+            self.assertTrue((repo / ".cursor/rules").is_symlink())
+
+    def test_repo_owned_instructions_are_preserved(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            temporary_root = Path(temporary)
+            root = copy_template_tree(temporary_root / "console")
+            repo = temporary_root / "repo"
+            repo.mkdir()
+            agents = repo / "AGENTS.md"
+            claude = repo / "CLAUDE.md"
+            agents.write_text("project facts\n", encoding="utf-8")
+            claude.write_text("claude project facts\n", encoding="utf-8")
+            registry, local = make_registry(temporary_root, repo, [])
+
+            apply_repos(root, registry_path=registry, local_path=local)
+
+            self.assertEqual(agents.read_text(encoding="utf-8"), "project facts\n")
+            self.assertEqual(
+                claude.read_text(encoding="utf-8"), "claude project facts\n"
+            )
+
     def test_profile_is_linked_for_all_clients(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             temporary_root = Path(temporary)
@@ -328,6 +367,19 @@ class RepoApplyTests(unittest.TestCase):
 
 
 class GlobalApplyTests(unittest.TestCase):
+    def test_global_apply_removes_legacy_home_agents_duplicate(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            home = Path(temporary)
+            legacy = home / "AGENTS.md"
+            legacy.symlink_to(PROJECT_ROOT / "rulesets/core/opencode/AGENTS.md")
+
+            apply_global(PROJECT_ROOT, home)
+
+            self.assertFalse(legacy.exists())
+            self.assertTrue((home / ".codex/AGENTS.md").is_symlink())
+            self.assertTrue((home / ".claude/CLAUDE.md").is_symlink())
+            self.assertTrue((home / ".config/opencode/AGENTS.md").is_symlink())
+
     def test_global_apply_preserves_unmanaged_hooks_and_installs_native_layers(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             home = Path(temporary)
