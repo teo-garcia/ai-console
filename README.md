@@ -95,11 +95,11 @@ request. Routine coding work should not load it.
 Globally linked general-purpose skills:
 
 - `engineering-workflows`
-- Matt Pocock’s `grill-me`
-- Matt Pocock’s `grill-with-docs`
 
 Vendored but not globally linked:
 
+- Matt Pocock’s skills (`grill-me` and `grill-with-docs` were retired: they
+  delegate to `/grilling` and `/domain-modeling`, which were never linked)
 - `vercel-labs/agent-skills`
 - `shadcn-ui/ui`
 - `shadcn/improve`
@@ -203,9 +203,10 @@ scripts/ai-console capabilities --client codex-cli
 scripts/ai-console doctor --client codex-cli
 ```
 
-Ask for the outcome directly: “test the login flow” or “trace this symbol.” The
-rules tell each client to prefer its native capability or installed plugin, then
-the globally configured MCP fallback. No profile name is required. Explicit
+Ask for the outcome directly: “test the login flow” or “trace this symbol.” Each
+client chooses among the tools it has; the shared rules do not encode provider
+routing; ai-console only decides which MCPs are installed. No profile name is
+required. Explicit
 selectors are optional overrides. `doctor --live` adds bounded TCP reachability
 checks; normal doctor and CI remain network-free.
 
@@ -239,22 +240,19 @@ The client-specific claims track the current official documentation for
 [OpenCode tools](https://opencode.ai/docs/tools).
 
 Codex MCP output also renders least-surprising approval defaults from the same
-policy: Context7 uses `auto`, Chrome DevTools and GitHub use `writes`, and remote
-service integrations use `prompt`. GitHub authentication reads a least-privilege
-PAT from `GITHUB_PAT_TOKEN`; generated configuration stores only the variable
-name. Capability validation fails if its declared approval or authentication
+policy: Context7 uses `auto`, Chrome DevTools uses `writes`, and remote service
+integrations use `prompt`. Capability validation fails if its declared approval or authentication
 policy drifts from the canonical MCP definition.
 
 ## MCP configuration
 
 `mcp/canonical.json` is the only hand-edited MCP definition. `scripts/render`
 generates a global baseline for all four clients: Context7, Chrome DevTools,
-Datadog, Atlassian, and CircleCI. Codex also receives GitHub's hosted MCP as a
-PAT-backed fallback. The tracked outputs deliberately retain the portable
+Datadog, Atlassian, and CircleCI. The tracked outputs deliberately retain the portable
 fallbacks. `scripts/apply-global` then discovers enabled plugins on
 the current computer and suppresses only the MCPs those plugins are proven to
 own. On this computer, Claude receives only CircleCI, Cursor receives every MCP
-except Context7, and OpenCode receives all five. Codex retains all six because
+except Context7, and OpenCode receives all five. Codex retains all five because
 its shared config also serves the plugin-less IDE; Desktop and CLI still prefer
 their native or installed plugins.
 Rendered files contain no fixed home-directory paths or credentials. OAuth and
@@ -267,11 +265,9 @@ only its now-redundant MCP is removed. No capability profile or repository-local
 state is required.
 
 GitHub is available through Codex's installed GitHub plugin and an authenticated
-`gh` CLI in every client. Codex also gets the hosted GitHub MCP, configured with
-`bearer_token_env_var = "GITHUB_PAT_TOKEN"`. Claude, Cursor, and OpenCode retain
-their native and CLI paths because a credential-free, portable remote-header
-configuration is not shared across those hosts. AI-console never copies the PAT
-value into generated configuration.
+`gh` CLI in every client. The hosted GitHub MCP was retired: it depended on a
+`GITHUB_PAT_TOKEN` variable that no client environment provided, and the plugin
+and `gh` already cover the same work.
 
 MCP is only one capability layer. Native client tools, installed skills,
 plugins, apps, and connectors remain available on demand even when their tool
@@ -352,7 +348,7 @@ authority—not a prerequisite the user must name in a prompt. The normal baseli
 is global.
 
 Herdr is a separate cross-client terminal orchestrator, not an MCP server. The
-shared rules tell every client it is available for persistent workspaces,
+shared rules do not mention it; use it deliberately for persistent workspaces,
 coordinated panes, agent sessions, worktrees, and handoffs when that complexity
 materially helps. OpenCode's global `herdr-agent-state` plugin only synchronizes
 working, blocked, and idle state with the owning pane; it does not replace the
@@ -427,8 +423,8 @@ evaluation routes require fixed settings for both variants.
 Model, reasoning, effort, and verbosity preferences remain native user settings.
 For example, Codex supports `model_verbosity`, but AI-console does not overwrite
 it or the existing model selection. Codex multi-agent is enabled by default in
-current releases; the shared rules now request delegation when work is genuinely
-parallel instead of forcing it for every task.
+current releases; the shared rules neither request nor forbid delegation, so
+each client's own judgment applies.
 
 ## Backup and restore
 

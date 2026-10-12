@@ -184,9 +184,6 @@ def verify_install(root: Path = ROOT, home: Path | None = None) -> Verifier:
     }
     skill_sources = {
         "engineering-workflows": root / "skills/shared/engineering-workflows",
-        "grill-me": root / "vendor/mattpocock-skills/skills/productivity/grill-me",
-        "grill-with-docs": root
-        / "vendor/mattpocock-skills/skills/engineering/grill-with-docs",
     }
     for skills_dir in (
         active_home / ".codex/skills",

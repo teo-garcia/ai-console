@@ -1,3 +1,7 @@
+> **Historical — superseded.** Written before the Python core, canonical MCP
+> rendering, tests, and CI existed. Its Go-rewrite and "no tests/CI" premises
+> no longer hold. Do not use it as a current-state description; see README.md.
+
 ## Codex
 
 Respect Codex-specific constraints and response style. Share only the solution below, aligned with the same structure used across the other LLM variants.

@@ -300,6 +300,7 @@ def _remove_managed_non_global_skills(
     if not skills_dir.is_dir():
         return
     vendor_roots = (
+        root / "vendor/mattpocock-skills",
         root / "vendor/vercel-labs-agent-skills",
         root / "vendor/shadcn-ui",
         root / "vendor/shadcn-improve",
@@ -392,16 +393,6 @@ def apply_global(
 
     for skills_dir in (codex_skills, cursor_skills, claude_skills, opencode_skills):
         _remove_managed_non_global_skills(runner, root, skills_dir)
-        _link_skill(
-            runner,
-            root / "vendor/mattpocock-skills/skills/productivity/grill-me",
-            skills_dir,
-        )
-        _link_skill(
-            runner,
-            root / "vendor/mattpocock-skills/skills/engineering/grill-with-docs",
-            skills_dir,
-        )
 
     managed = _managed_servers(root)
     codex_destination = target("codex", "mcpConfig")

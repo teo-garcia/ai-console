@@ -35,9 +35,8 @@ class McpRenderingTests(unittest.TestCase):
         self.assertIn("[mcp_servers.context7]", codex)
         self.assertIn("[mcp_servers.atlassian]", codex)
         self.assertIn("[mcp_servers.chrome-devtools]", codex)
-        self.assertIn("[mcp_servers.github]", codex)
-        self.assertIn('bearer_token_env_var = "GITHUB_PAT_TOKEN"', codex)
-        self.assertNotIn('auth = "pat-env"', codex)
+        self.assertNotIn("[mcp_servers.github]", codex)
+        self.assertNotIn("GITHUB_PAT_TOKEN", codex)
 
         claude = json.loads(outputs[root / "mcp/claude.mcp.json"])
         self.assertEqual(
@@ -90,7 +89,6 @@ class McpRenderingTests(unittest.TestCase):
             "datadog",
             "atlassian",
             "circleci",
-            "github",
         )
 
         self.assertEqual(effective_server_names(root, ()), all_servers)
@@ -100,11 +98,11 @@ class McpRenderingTests(unittest.TestCase):
         )
         self.assertEqual(
             effective_server_names(root, (), client="claude"),
-            all_servers[:-1],
+            all_servers,
         )
         self.assertEqual(
             effective_server_names(root, (), client="cursor"),
-            all_servers[:-1],
+            all_servers,
         )
 
     def test_runtime_plugin_evidence_suppresses_only_proven_owners(self) -> None:
