@@ -55,6 +55,8 @@ class McpRenderingTests(unittest.TestCase):
             [["opencode-goal-plugin@0.8.2", {"persistState": False}]],
         )
         self.assertIn("goal", opencode["command"])
+        self.assertEqual(opencode["permission"]["bash"]["*"], "allow")
+        self.assertEqual(opencode["permission"]["bash"]["git push*"], "ask")
         self.assertEqual(
             set(opencode["mcp"]),
             {"context7", "chrome-devtools", "datadog", "atlassian", "circleci"},

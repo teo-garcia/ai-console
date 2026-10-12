@@ -451,7 +451,10 @@ def apply_global(
     runner.link(root / "mcp/opencode.jsonc", target("opencode", "mcpConfig"))
     cursor_destination = target("cursor", "cliConfig")
     cursor_existing = load_json(cursor_destination) if cursor_destination.exists() else {}
-    cursor_baseline = load_json(root / "status-lines/cursor.json")
+    cursor_baseline = merge_nested_config(
+        load_json(root / "status-lines/cursor.json"),
+        load_json(root / "config/cursor-permissions.json"),
+    )
     runner.write(
         cursor_destination,
         json.dumps(merge_nested_config(cursor_existing, cursor_baseline), indent=2)

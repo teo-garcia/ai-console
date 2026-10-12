@@ -240,8 +240,15 @@ def render_global_config(
         "machine-effective global MCP baseline"
         if enabled_plugins is not None
         else "portable global MCP fallback baseline",
-        client_config=opencode_plugin_config(root) if client == "opencode" else None,
+        client_config=opencode_client_config(root) if client == "opencode" else None,
     )
+
+
+def opencode_client_config(root: Path) -> dict[str, Any]:
+    """Plugins and commands from the plugin registry plus the managed bash policy."""
+    config = opencode_plugin_config(root)
+    config["permission"] = load_json(root / "config/opencode-permission.json")
+    return config
 
 
 def profile_config_path(root: Path, profile_names: tuple[str, ...], client: str) -> Path:

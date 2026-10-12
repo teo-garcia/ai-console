@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "deny": [
+      "Shell(git:push*)",
+      "Shell(git:clean*)",
+      "Shell(git:reset --hard*)",
+      "Shell(rm:-r*)",
+      "Shell(rm:-f*)",
+      "Shell(gh:pr create*)",
+      "Shell(gh:pr merge*)",
+      "Shell(gh:pr ready*)",
+      "Shell(gh:pr comment*)",
+      "Shell(gh:pr review*)",
+      "Shell(gh:issue create*)",
+      "Shell(gh:issue comment*)",
+      "Shell(gh:api*-X*)",
+      "Shell(gh:api*--method*)",
+      "Shell(gh:api* -f *)",
+      "Shell(gh:api* -F *)",
+      "Shell(gh:api*--field*)",
+      "Shell(gh:api*--raw-field*)",
+      "Shell(gh:api*--input*)",
+      "Shell(terraform:apply*)",
+      "Shell(terraform:destroy*)",
+      "Shell(kubectl:apply*)",
+      "Shell(kubectl:delete*)",
+      "Shell(kubectl:config use-context*)"
+    ]
+  }
+}

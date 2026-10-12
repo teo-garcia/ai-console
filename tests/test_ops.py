@@ -443,6 +443,7 @@ class GlobalApplyTests(unittest.TestCase):
             )
             self.assertTrue(cursor_config["display"]["showStatusLineRunningTime"])
             self.assertEqual(cursor_config["display"]["mode"], "zen")
+            self.assertIn("Shell(git:push*)", cursor_config["permissions"]["deny"])
             cursor_mcp = json.loads(
                 (home / ".cursor/mcp.json").read_text(encoding="utf-8")
             )
