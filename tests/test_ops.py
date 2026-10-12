@@ -436,6 +436,12 @@ class GlobalApplyTests(unittest.TestCase):
                 any("herdr" in json.dumps(item) for item in cursor_hooks["hooks"]["sessionStart"])
             )
             self.assertEqual(claude_settings["theme"], "dark")
+            self.assertEqual(
+                claude_settings["pluginConfigs"]["cc-plugin-agents-md@builtin"][
+                    "options"
+                ]["instructionFiles"],
+                "claude-md-and-agents-md",
+            )
             self.assertEqual(claude_settings["permissions"]["defaultMode"], "auto")
             self.assertEqual(
                 claude_settings["statusLine"]["command"],
@@ -451,13 +457,10 @@ class GlobalApplyTests(unittest.TestCase):
                 (home / ".claude.json").read_text(encoding="utf-8")
             )["mcpServers"]
             self.assertEqual(
-                set(cursor_mcp["mcpServers"]),
-                {"context7", "chrome-devtools", "datadog", "atlassian", "circleci"},
+                set(cursor_mcp["mcpServers"]), {"context7", "chrome-devtools"}
             )
-            self.assertTrue(
-                {"context7", "chrome-devtools", "datadog", "atlassian", "circleci"}
-                <= set(claude_mcp)
-            )
+            self.assertTrue({"context7", "chrome-devtools"} <= set(claude_mcp))
+            self.assertFalse({"datadog", "atlassian", "circleci"} & set(claude_mcp))
             self.assertTrue((home / ".claude/ai-console-statusline.sh").is_symlink())
             self.assertIn(
                 "Bash(git push *)", claude_settings["permissions"]["ask"]
@@ -517,17 +520,12 @@ class GlobalApplyTests(unittest.TestCase):
             cursor_servers = json.loads(cursor_mcp.read_text(encoding="utf-8"))[
                 "mcpServers"
             ]
-            self.assertEqual(
-                set(cursor_servers), {"datadog", "atlassian", "circleci"}
-            )
+            self.assertEqual(set(cursor_servers), set())
             claude_servers = json.loads(
                 (home / ".claude.json").read_text(encoding="utf-8")
             )["mcpServers"]
             self.assertNotIn("context7", claude_servers)
-            self.assertEqual(
-                set(claude_servers),
-                {"chrome-devtools", "datadog", "atlassian", "circleci"},
-            )
+            self.assertEqual(set(claude_servers), {"chrome-devtools"})
 
 
 class BackupRestoreTests(unittest.TestCase):

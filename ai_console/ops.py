@@ -284,6 +284,14 @@ def merge_claude_settings(
     if not isinstance(status_line, dict):
         raise ConfigError("Claude settings baseline requires a statusLine object")
     result["statusLine"] = status_line
+    plugin_configs = baseline.get("pluginConfigs")
+    if plugin_configs is not None:
+        if not isinstance(plugin_configs, dict):
+            raise ConfigError("Claude settings pluginConfigs must be an object")
+        current = result.get("pluginConfigs")
+        result["pluginConfigs"] = merge_nested_config(
+            current if isinstance(current, dict) else {}, plugin_configs
+        )
     return result
 
 

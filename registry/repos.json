@@ -13,6 +13,11 @@
       "name": "teo-garcia",
       "ruleset": "core",
       "mcpProfiles": []
+    },
+    {
+      "name": "work",
+      "ruleset": "core",
+      "mcpProfiles": ["work"]
     }
   ]
 }

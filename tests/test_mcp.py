@@ -23,7 +23,8 @@ class McpRenderingTests(unittest.TestCase):
         root = Path(__file__).resolve().parent.parent
         outputs = expected_outputs(root)
 
-        self.assertEqual(len(outputs), len(CLIENTS))
+        global_outputs = [path for path in outputs if "profiles" not in path.parts]
+        self.assertEqual(len(global_outputs), len(CLIENTS))
         for path, content in outputs.items():
             self.assertNotIn("${", content, path)
             if path.suffix == ".toml":
@@ -33,20 +34,20 @@ class McpRenderingTests(unittest.TestCase):
 
         codex = outputs[root / "mcp/codex.config.toml"]
         self.assertIn("[mcp_servers.context7]", codex)
-        self.assertIn("[mcp_servers.atlassian]", codex)
         self.assertIn("[mcp_servers.chrome-devtools]", codex)
+        self.assertNotIn("[mcp_servers.atlassian]", codex)
         self.assertNotIn("[mcp_servers.github]", codex)
         self.assertNotIn("GITHUB_PAT_TOKEN", codex)
 
         claude = json.loads(outputs[root / "mcp/claude.mcp.json"])
         self.assertEqual(
             list(claude["mcpServers"]),
-            ["context7", "chrome-devtools", "datadog", "atlassian", "circleci"],
+            ["context7", "chrome-devtools"],
         )
         cursor = json.loads(outputs[root / "mcp/cursor.mcp.json"])
         self.assertEqual(
             list(cursor["mcpServers"]),
-            ["context7", "chrome-devtools", "datadog", "atlassian", "circleci"],
+            ["context7", "chrome-devtools"],
         )
 
         opencode = json.loads(outputs[root / "mcp/opencode.jsonc"])
@@ -59,8 +60,15 @@ class McpRenderingTests(unittest.TestCase):
         self.assertEqual(opencode["permission"]["bash"]["git push*"], "ask")
         self.assertEqual(
             set(opencode["mcp"]),
-            {"context7", "chrome-devtools", "datadog", "atlassian", "circleci"},
+            {"context7", "chrome-devtools"},
         )
+
+        work_claude = json.loads(outputs[root / "mcp/profiles/work/claude.mcp.json"])
+        self.assertEqual(
+            list(work_claude["mcpServers"]), ["datadog", "atlassian", "circleci"]
+        )
+        work_codex = outputs[root / "mcp/profiles/work/codex.config.toml"]
+        self.assertIn("[mcp_servers.atlassian]", work_codex)
 
     def test_render_check_detects_and_repairs_drift(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -85,27 +93,16 @@ class McpRenderingTests(unittest.TestCase):
 
     def test_portable_templates_keep_fallbacks_without_runtime_plugin_evidence(self) -> None:
         root = Path(__file__).resolve().parent.parent
-        all_servers = (
-            "context7",
-            "chrome-devtools",
-            "datadog",
-            "atlassian",
-            "circleci",
-        )
+        personal = ("context7", "chrome-devtools")
+        with_work = (*personal, "datadog", "atlassian", "circleci")
 
-        self.assertEqual(effective_server_names(root, ()), all_servers)
-        self.assertEqual(
-            effective_server_names(root, (), client="codex"),
-            all_servers,
-        )
-        self.assertEqual(
-            effective_server_names(root, (), client="claude"),
-            all_servers,
-        )
-        self.assertEqual(
-            effective_server_names(root, (), client="cursor"),
-            all_servers,
-        )
+        self.assertEqual(effective_server_names(root, ()), personal)
+        self.assertEqual(effective_server_names(root, ("work",)), with_work)
+        for client in ("codex", "claude", "cursor"):
+            self.assertEqual(effective_server_names(root, (), client=client), personal)
+            self.assertEqual(
+                effective_server_names(root, ("work",), client=client), with_work
+            )
 
     def test_runtime_plugin_evidence_suppresses_only_proven_owners(self) -> None:
         root = Path(__file__).resolve().parent.parent
@@ -113,7 +110,7 @@ class McpRenderingTests(unittest.TestCase):
         self.assertEqual(
             effective_server_names(
                 root,
-                (),
+                ("work",),
                 client="cursor",
                 enabled_plugins={"context7-plugin", "devtools-for-agents"},
             ),
@@ -122,7 +119,7 @@ class McpRenderingTests(unittest.TestCase):
         self.assertEqual(
             effective_server_names(
                 root,
-                (),
+                ("work",),
                 client="cursor",
                 enabled_plugins={
                     "context7-plugin",
@@ -137,7 +134,7 @@ class McpRenderingTests(unittest.TestCase):
         self.assertEqual(
             effective_server_names(
                 root,
-                (),
+                ("work",),
                 client="claude",
                 enabled_plugins={"context7", "chrome-devtools-mcp"},
             ),

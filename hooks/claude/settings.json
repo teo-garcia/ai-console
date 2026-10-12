@@ -35,6 +35,11 @@
       "Read(~/.aws/**)"
     ]
   },
+  "pluginConfigs": {
+    "cc-plugin-agents-md@builtin": {
+      "options": { "instructionFiles": "claude-md-and-agents-md" }
+    }
+  },
   "statusLine": {
     "type": "command",
     "command": "~/.claude/ai-console-statusline.sh",

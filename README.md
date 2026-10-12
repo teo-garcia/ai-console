@@ -129,17 +129,13 @@ The selected baseline is client-specific and user-scoped:
 | Client | Selected plugins | Why |
 | --- | --- | --- |
 | Codex | Runtime Browser, Chrome, Computer Use; curated GitHub | Lazy bundles supplied by Codex; Datadog and CircleCI fall back to MCP because the account administrator blocks their curated plugins |
-| Claude Code | `typescript-lsp`, Context7, Chrome DevTools, Datadog, Atlassian | Official user-scope plugins replace four duplicate standalone MCP registrations and add focused skills where available |
+| Claude Code | `typescript-lsp`, Context7, Chrome DevTools | Official user-scope plugins replace the two personal standalone MCPs. The Datadog and Atlassian plugins are disabled: work integrations come from the `/work` overlay instead |
 | Cursor CLI | Context7 installed; Chrome Devtools for Agents, Datadog, Atlassian, CircleCI selected | Context7 replaces its MCP now; the four reviewed marketplace packages remain manual optional installs because working MCP fallbacks are already global |
 | OpenCode | `opencode-goal-plugin@0.8.2`; Herdr state reporter | No verified ecosystem plugin replaces these five MCPs; Herdr reports pane state without repository files |
 
-Claude's installed plugins own Context7, Chrome DevTools, Datadog, and Atlassian,
-so only CircleCI remains in the applied Claude MCP config. Cursor's installed
-Context7 plugin owns that integration; the four selected marketplace plugins do
-not suppress their MCP fallbacks until installation is verified locally. Datadog's
-Claude hooks run only after visualization tools and at
-session end; they are not an ambient prompt payload. Authentication stays lazy
-and client-local.
+Claude's installed plugins own Context7 and Chrome DevTools, so the applied
+global Claude MCP config is empty. Cursor's installed Context7 plugin owns that
+integration. Authentication stays lazy and client-local.
 
 Codex uses one MCP configuration for Desktop, CLI, and IDE, but Codex plugins are
 not available in the IDE. The five MCP entries therefore remain in the shared
@@ -210,10 +206,12 @@ required. Explicit
 selectors are optional overrides. `doctor --live` adds bounded TCP reachability
 checks; normal doctor and CI remain network-free.
 
-The shipped capability baseline is global and `mcp/canonical.json` defines no
-profiles. Repository registration binds paths and rules; every tracked
-`mcpProfiles` list is empty. The dormant profile parser is compatibility
-infrastructure, not part of the active setup.
+The global baseline is personal: Context7 and Chrome DevTools. Work
+integrations (Datadog US5, Atlassian, CircleCI) live in the `work` profile, which
+the registry binds once to `~/Desktop/_/work`. `apply-repos` links each client's
+project config there (`.mcp.json`, `.codex/config.toml`, `.cursor/mcp.json`,
+`opencode.jsonc`), so a session started in `/work` gets them automatically and
+no other session does. Nothing is selected by hand at runtime.
 
 The resolver reports configuration separately from authentication, reachability,
 and current-session activation. It never installs or invokes a tool. Serena and
@@ -247,14 +245,10 @@ policy drifts from the canonical MCP definition.
 ## MCP configuration
 
 `mcp/canonical.json` is the only hand-edited MCP definition. `scripts/render`
-generates a global baseline for all four clients: Context7, Chrome DevTools,
-Datadog, Atlassian, and CircleCI. The tracked outputs deliberately retain the portable
-fallbacks. `scripts/apply-global` then discovers enabled plugins on
-the current computer and suppresses only the MCPs those plugins are proven to
-own. On this computer, Claude receives only CircleCI, Cursor receives every MCP
-except Context7, and OpenCode receives all five. Codex retains all five because
-its shared config also serves the plugin-less IDE; Desktop and CLI still prefer
-their native or installed plugins.
+generates a personal global baseline for all four clients (Context7, Chrome
+DevTools) and the `work` profile files. `scripts/apply-global` discovers enabled
+plugins and suppresses only the global MCPs those plugins are proven to own.
+`scripts/apply-repos` links the `work` profile into `~/Desktop/_/work`.
 Rendered files contain no fixed home-directory paths or credentials. OAuth and
 service approval stay client-local.
 
@@ -343,9 +337,9 @@ Local binding, stored only in ignored `registry/repos.local.json`:
 The verifier scans canonical, global, and any future profile output for machine
 home paths and fails on generated drift.
 
-Profiles are reserved infrastructure for future project-specific targets or
-authority—not a prerequisite the user must name in a prompt. The normal baseline
-is global.
+Profiles bind integrations to a location, never to a prompt: the user does not
+name or select one. The only shipped profile is `work`, bound to
+`~/Desktop/_/work`.
 
 Herdr is a separate cross-client terminal orchestrator, not an MCP server. The
 shared rules do not mention it; use it deliberately for persistent workspaces,

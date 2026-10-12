@@ -19,13 +19,18 @@
   "global": {
     "servers": [
       "context7",
-      "chrome-devtools",
-      "datadog",
-      "atlassian",
-      "circleci"
+      "chrome-devtools"
     ]
   },
-  "profiles": {},
+  "profiles": {
+    "work": {
+      "servers": [
+        "datadog",
+        "atlassian",
+        "circleci"
+      ]
+    }
+  },
   "servers": {
     "context7": {
       "transport": "remote",

@@ -92,7 +92,7 @@ class CapabilityResolutionTests(unittest.TestCase):
                             for item in by_name["observability"]["implementations"]
                             if item["id"] == "datadog"
                         )["state"],
-                        "configured",
+                        "available-profile",
                     )
                     self.assertEqual(
                         by_name["desktop-control"]["preferred"],
@@ -126,13 +126,7 @@ class CapabilityResolutionTests(unittest.TestCase):
             self.assertEqual(payload["previewProfiles"], [])
             self.assertEqual(
                 payload["effectiveMcpServers"],
-                [
-                    "context7",
-                    "chrome-devtools",
-                    "datadog",
-                    "atlassian",
-                    "circleci",
-                ],
+                ["context7", "chrome-devtools"],
             )
             self.assertEqual(payload["previewMcpServers"], payload["effectiveMcpServers"])
             by_name = {item["name"]: item for item in payload["capabilities"]}
@@ -144,10 +138,8 @@ class CapabilityResolutionTests(unittest.TestCase):
                 by_name["browser-testing"]["preferred"],
                 "chrome-devtools",
             )
-            self.assertEqual(
-                by_name["work-tracking"]["preferred"],
-                "atlassian",
-            )
+            # Work integrations live in the /work overlay, not the global baseline.
+            self.assertIsNone(by_name["work-tracking"]["preferred"])
             self.assertEqual(
                 by_name["terminal-orchestration"]["preferred"], "herdr-cli"
             )
@@ -431,7 +423,7 @@ class CapabilityResolutionTests(unittest.TestCase):
         self.assertEqual(
             docs["implementations"][0]["reachable"], "reachable"
         )
-        self.assertEqual(create_connection.call_count, 4)
+        self.assertEqual(create_connection.call_count, 1)
 
 
 if __name__ == "__main__":

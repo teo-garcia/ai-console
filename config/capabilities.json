@@ -519,6 +519,7 @@
             "opencode"
           ],
           "mcpServer": "datadog",
+          "profile": "work",
           "auth": "oauth",
           "approval": "prompt",
           "useWhen": "An authorized incident or operational question requires Datadog evidence"
@@ -619,6 +620,7 @@
             "opencode"
           ],
           "mcpServer": "atlassian",
+          "profile": "work",
           "auth": "oauth",
           "approval": "prompt",
           "useWhen": "An authorized task needs Atlassian records or must change Jira or Confluence state"
@@ -664,6 +666,7 @@
             "opencode"
           ],
           "mcpServer": "circleci",
+          "profile": "work",
           "auth": "oauth",
           "approval": "prompt",
           "useWhen": "An authorized task needs CircleCI run evidence or must rerun or cancel a workflow"
