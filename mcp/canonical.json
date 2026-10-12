@@ -45,7 +45,7 @@
     },
     "datadog": {
       "transport": "remote",
-      "url": "https://mcp.us5.datadoghq.com/api/unstable/mcp-server/mcp",
+      "url": "https://mcp.us5.datadoghq.com/v1/mcp",
       "auth": "oauth",
       "approvalMode": "prompt"
     },
