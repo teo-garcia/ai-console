@@ -23,6 +23,7 @@ from .mcp import (
     render_profile_config,
 )
 from .ops import (
+    GLOBAL_VENDOR_SKILLS,
     _managed_servers,
     merge_claude_config,
     merge_claude_settings,
@@ -184,6 +185,7 @@ def verify_install(root: Path = ROOT, home: Path | None = None) -> Verifier:
     }
     skill_sources = {
         "engineering-workflows": root / "skills/shared/engineering-workflows",
+        **{name: root / relative for name, relative in GLOBAL_VENDOR_SKILLS.items()},
     }
     for skills_dir in (
         active_home / ".codex/skills",

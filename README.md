@@ -92,25 +92,22 @@ The `engineering-workflows` skill is reserved for incidents, complex
 migrations, consequential architecture decisions, or an explicit playbook
 request. Routine coding work should not load it.
 
-Globally linked general-purpose skills:
+Globally linked general-purpose skills (technology-neutral, self-contained, no
+writes into the repository except `improve`'s `plans/`):
 
-- `engineering-workflows`
+- `engineering-workflows`: incidents, migrations, architecture decisions
+- `grilling` (Matt Pocock): stress-test a plan; triggers on "grill"
+- `handoff` (Matt Pocock): compact the session for another agent; manual only
+- `improve` (shadcn): whole-repo advisor that writes handoff plans to `plans/`;
+  invoke explicitly (`/improve`, `$improve`), since it can fan out to many subagents
 
-Vendored but not globally linked:
+The list lives in `GLOBAL_VENDOR_SKILLS` (`ai_console/ops.py`); `apply` links
+those and removes any other link into `vendor/`. Review usage monthly and drop
+what goes unused.
 
-- Matt Pocock’s skills (`grill-me` and `grill-with-docs` were retired: they
-  delegate to `/grilling` and `/domain-modeling`, which were never linked)
-- `vercel-labs/agent-skills`
-- `shadcn-ui/ui`
-- `shadcn/improve`
-
-Enable `shadcn/improve` only for the task that needs it:
-
-```sh
-scripts/toggle-skill enable improve
-scripts/toggle-skill status improve
-scripts/toggle-skill disable improve
-```
+Vendored but not globally linked: the rest of Matt Pocock's skills (`grill-me`
+and `grill-with-docs` are wrappers around `grilling` and `domain-modeling`),
+`vercel-labs/agent-skills`, and `shadcn-ui/ui`.
 
 Never install `garrytan/gstack` or `obra/superpowers` permanently. Pull either
 on demand and remove it after the task.

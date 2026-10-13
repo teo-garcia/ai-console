@@ -8,6 +8,7 @@ from pathlib import Path
 
 from ai_console.config import ConfigError
 from ai_console.ops import (
+    GLOBAL_VENDOR_SKILLS,
     Runner,
     _managed_servers,
     apply_global,
@@ -379,6 +380,29 @@ class GlobalApplyTests(unittest.TestCase):
             self.assertTrue((home / ".codex/AGENTS.md").is_symlink())
             self.assertTrue((home / ".claude/CLAUDE.md").is_symlink())
             self.assertTrue((home / ".config/opencode/AGENTS.md").is_symlink())
+
+    def test_global_apply_links_allowlisted_vendor_skills_only(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            home = Path(temporary)
+            stray = home / ".claude/skills/grill-me"
+            stray.parent.mkdir(parents=True)
+            stray.symlink_to(
+                PROJECT_ROOT / "vendor/mattpocock-skills/skills/productivity/grill-me"
+            )
+
+            apply_global(PROJECT_ROOT, home)
+
+            self.assertFalse(stray.is_symlink())
+            for skills_dir in (
+                ".codex/skills",
+                ".cursor/skills",
+                ".claude/skills",
+                ".config/opencode/skills",
+            ):
+                for name, relative in GLOBAL_VENDOR_SKILLS.items():
+                    link = home / skills_dir / name
+                    self.assertTrue(link.is_symlink(), link)
+                    self.assertEqual(Path(os.readlink(link)), PROJECT_ROOT / relative)
 
     def test_global_apply_preserves_unmanaged_hooks_and_installs_native_layers(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

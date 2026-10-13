@@ -295,6 +295,16 @@ def merge_claude_settings(
     return result
 
 
+# Vendored skills linked globally into every client. Everything else under the
+# vendor roots stays unlinked (and is removed if found). Keep this list short:
+# technology-neutral, self-contained, and no writes outside the session.
+GLOBAL_VENDOR_SKILLS: dict[str, str] = {
+    "grilling": "vendor/mattpocock-skills/skills/productivity/grilling",
+    "handoff": "vendor/mattpocock-skills/skills/productivity/handoff",
+    "improve": "vendor/shadcn-improve/skills/improve",
+}
+
+
 def _link_skill(runner: Runner, source: Path, skills_dir: Path) -> None:
     if not (source / "SKILL.md").is_file():
         runner.emit(f"skip: missing skill {source / 'SKILL.md'}")
@@ -313,10 +323,13 @@ def _remove_managed_non_global_skills(
         root / "vendor/shadcn-ui",
         root / "vendor/shadcn-improve",
     )
+    allowed = {root / relative for relative in GLOBAL_VENDOR_SKILLS.values()}
     for candidate in skills_dir.iterdir():
         if not candidate.is_symlink():
             continue
         raw_target = Path(os.readlink(candidate))
+        if raw_target in allowed and candidate.name == raw_target.name:
+            continue
         for vendor_root in vendor_roots:
             try:
                 raw_target.relative_to(vendor_root)
@@ -398,6 +411,10 @@ def apply_global(
                 opencode_skills,
             ):
                 _link_skill(runner, skill, skills_dir)
+
+    for relative in GLOBAL_VENDOR_SKILLS.values():
+        for skills_dir in (codex_skills, cursor_skills, claude_skills, opencode_skills):
+            _link_skill(runner, root / relative, skills_dir)
 
     for skills_dir in (codex_skills, cursor_skills, claude_skills, opencode_skills):
         _remove_managed_non_global_skills(runner, root, skills_dir)
